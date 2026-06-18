@@ -1,0 +1,41 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "function": "api"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "functions": {
+    "source": ".",
+    "runtime": "nodejs22",
+    "codebase": "default",
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".npm-cache",
+      ".firebase-config",
+      ".gcloud-config",
+      ".shiptec",
+      "projects",
+      "tests",
+      "firebase-debug.log",
+      "firebase-debug.*.log"
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

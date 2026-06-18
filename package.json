@@ -1,0 +1,38 @@
+{
+  "name": "shiptec",
+  "version": "0.1.0",
+  "description": "Shiptec command center for disciplined Architect-Builder software delivery.",
+  "type": "module",
+  "main": "dist/src/firebaseFunction.js",
+  "engines": {
+    "node": "22"
+  },
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "deploy": "npm.cmd run build && firebase.cmd deploy",
+    "deploy:hosting": "npm.cmd run build && firebase.cmd deploy --only hosting",
+    "deploy:functions": "npm.cmd run build && firebase.cmd deploy --only functions,firestore",
+    "start": "node dist/src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase-admin": "^13.10.0",
+    "firebase-functions": "^7.2.5",
+    "simple-git": "^3.27.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

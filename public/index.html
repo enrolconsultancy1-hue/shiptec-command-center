@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shiptec Command Center</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Shiptec</p>
+          <h1>Command Center</h1>
+        </div>
+        <div class="status-pill" id="serviceStatus">Checking</div>
+      </section>
+
+      <section class="workspace">
+        <form class="panel intake-panel" id="intakeForm">
+          <div class="panel-head">
+            <h2>Architect Intake</h2>
+            <button type="submit">Initialize</button>
+          </div>
+
+          <label>
+            Project name
+            <input name="projectName" value="Shiptec Command Center" required>
+          </label>
+
+          <label>
+            Project folder
+            <input name="rootPath" value="C:\Users\hp\projects\Shitec\projects\shiptec-command-center" required>
+          </label>
+
+          <label>
+            Product summary
+            <textarea name="productSummary" required>A governed command center that turns software ideas into Architect Packs, validation gates, sprint dry runs, and implementation records.</textarea>
+          </label>
+
+          <label>
+            Business problem
+            <textarea name="businessProblem" required>AI-assisted software work often starts from vague prompts and lacks durable planning, acceptance criteria, and delivery governance.</textarea>
+          </label>
+
+          <div class="grid-two">
+            <label>
+              Target users
+              <textarea name="targetUsers" required>Founder
+Product engineer
+AI builder operator</textarea>
+            </label>
+
+            <label>
+              Success criteria
+              <textarea name="successCriteria" required>Initialize required Shiptec folders
+Generate governance templates
+Create Architect Pack from intake
+Detect validation issues
+Report project health
+Prepare sprint dry run</textarea>
+            </label>
+          </div>
+
+          <label>
+            Current workflow
+            <textarea name="currentWorkflow" required>Users describe ideas in chat and manually track requirements, risks, decisions, and sprint execution.</textarea>
+          </label>
+
+          <label>
+            Desired workflow
+            <textarea name="desiredWorkflow" required>Users complete structured intake, generate planning artifacts, validate readiness, create sprint plans, and execute through Builder dry runs.</textarea>
+          </label>
+
+          <label>
+            MVP definition
+            <textarea name="mvpDefinition" required>A backend API and cockpit that initializes a governed project, generates source-of-truth planning artifacts, validates intake, creates sprint files, and reports health.</textarea>
+          </label>
+
+          <div class="grid-two">
+            <label>
+              Tools and integrations
+              <textarea name="toolsAndIntegrations">Local filesystem
+Git
+GitHub via token when configured</textarea>
+            </label>
+
+            <label>
+              Technical constraints
+              <textarea name="technicalConstraints">Node.js
+TypeScript
+Express
+Markdown artifacts
+No silent overwrites</textarea>
+            </label>
+          </div>
+
+          <div class="grid-two">
+            <label>
+              Known risks
+              <textarea name="knownRisks">GitHub credentials may be missing
+Open questions may block Builder execution
+Generated templates must avoid overwriting user-authored content</textarea>
+            </label>
+
+            <label>
+              Open questions
+              <textarea name="openQuestions"></textarea>
+            </label>
+          </div>
+        </form>
+
+        <aside class="panel command-panel">
+          <div class="panel-head">
+            <h2>Project Ops</h2>
+            <span id="projectId">shiptec-command-center</span>
+          </div>
+
+          <label class="project-picker">
+            Known projects
+            <select id="projectSelect">
+              <option value="shiptec-command-center">shiptec-command-center</option>
+            </select>
+          </label>
+
+          <div class="health-meter">
+            <div>
+              <p>Health</p>
+              <strong id="healthScore">--</strong>
+            </div>
+            <div class="meter-track">
+              <div id="meterFill"></div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="button" data-action="scan">Scan</button>
+            <button type="button" data-action="validate">Validate</button>
+            <button type="button" data-action="dryRun">Dry Run</button>
+            <button type="button" data-action="git">Git Status</button>
+            <button type="button" data-action="accept">Accept</button>
+            <button type="button" data-action="commit">Commit</button>
+          </div>
+
+          <div class="summary">
+            <h3>Current State</h3>
+            <dl>
+              <div>
+                <dt>Required files</dt>
+                <dd id="fileState">--</dd>
+              </div>
+              <div>
+                <dt>Validation</dt>
+                <dd id="validationState">--</dd>
+              </div>
+              <div>
+                <dt>Git</dt>
+                <dd id="gitState">--</dd>
+              </div>
+              <div>
+                <dt>GitHub</dt>
+                <dd id="githubState">--</dd>
+              </div>
+              <div>
+                <dt>Acceptance</dt>
+                <dd id="acceptanceState">--</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="insight-panel">
+            <div class="insight-head">
+              <h3>Validation Findings</h3>
+              <span id="findingCount">0</span>
+            </div>
+            <ul id="validationFindings" class="insight-list">
+              <li class="empty">Run validation to review readiness.</li>
+            </ul>
+          </div>
+
+          <div class="insight-panel">
+            <div class="insight-head">
+              <h3>Next Actions</h3>
+              <span id="actionCount">0</span>
+            </div>
+            <ul id="recommendedActions" class="insight-list">
+              <li class="empty">Run scan to see recommended actions.</li>
+            </ul>
+          </div>
+
+          <div class="artifact-panel">
+            <div class="artifact-head">
+              <h3>Artifacts</h3>
+              <select id="artifactSelect">
+                <option value="Planning/Architect_Pack.md">Architect Pack</option>
+                <option value="Planning/Technical_Blueprint.md">Technical Blueprint</option>
+                <option value="Planning/Validation_Report.md">Validation Report</option>
+                <option value="Planning/Governance/Acceptance_Criteria.md">Acceptance Criteria</option>
+                <option value="Sprints/Sprint_001/Sprint_Plan.md">Sprint Plan</option>
+                <option value="Sprints/Sprint_001/Builder_Dry_Run.md">Builder Dry Run</option>
+                <option value="Sprints/Sprint_001/Acceptance_Report.md">Acceptance Report</option>
+              </select>
+            </div>
+            <button type="button" data-action="artifact">View Artifact</button>
+            <pre id="artifactView">Select an artifact.</pre>
+          </div>
+
+          <div class="log-panel">
+            <h3>Activity</h3>
+            <pre id="activityLog">Ready.</pre>
+          </div>
+        </aside>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
