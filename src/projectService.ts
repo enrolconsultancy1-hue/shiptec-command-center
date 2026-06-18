@@ -213,8 +213,39 @@ function getAllowedArtifactPaths(): string[] {
   ];
 }
 
-export async function createSprint(project: ProjectRecord, sprintNumber: number): Promise<SprintRecord> {
-  if (!Number.isInteger(sprintNumber) || sprintNumber < 1 || sprintNumber > 999) {
+export async function researchPatterns(project: ProjectRecord, approved: boolean, query?: string): Promise<{ notes: string; source: string }> {
+  if (!approved) {
+    throw badRequest("Network access not approved for pattern research.");
+  }
+
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    return {
+      notes: "Researching patterns locally (Network unavailable or token missing):\n\n- Use standard project structure.\n- Leverage TypeScript strict mode.\n- Keep service layer thin.\n- Maintain architectural separation.",
+      source: "local-best-practices"
+    };
+  }
+
+  const octokit = new Octokit({ auth: token });
+  const search = await octokit.rest.search.repos({
+    q: query || `${project.intake.technicalConstraints.join(" ")}`,
+    sort: "stars",
+    order: "desc",
+    per_page: 3
+  });
+
+  const notes = search.data.items
+    .map((repo: any) => `- Look at ${repo.html_url} for structure and patterns related to ${project.intake.toolsAndIntegrations.join(", ")}.`)
+    .join("\n");
+
+  const finalNotes = `Pattern Research Results:\n\n${notes}\n\n- Avoid direct copying.\n- Adapt patterns to Shiptec's folder structure.`;
+
+  await writeArtifact(project, "Planning/Patterns_Notes.md", finalNotes);
+
+  return { notes: finalNotes, source: "github-search" };
+}
+
+export async function createSprint(project: ProjectRecord, sprintNumber: number): Promise<SprintRecord> {  if (!Number.isInteger(sprintNumber) || sprintNumber < 1 || sprintNumber > 999) {
     throw badRequest("Sprint number must be an integer from 1 to 999.", { sprintNumber });
   }
 

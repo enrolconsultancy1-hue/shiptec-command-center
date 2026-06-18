@@ -236,6 +236,31 @@ describe("Shiptec API contract", () => {
     }
   });
 
+  it("researches patterns through the API", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-api-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "demo-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+
+      const researchResponse = await postJson(`${server.url}/projects/${initBody.project.id}/patterns/research`, {
+        approved: true
+      });
+      
+      expect(researchResponse.status).toBe(200);
+      const researchBody = await researchResponse.json() as { result: { notes: string; source: string } };
+      expect(researchBody.result.notes).toBeDefined();
+      expect(researchBody.result.source).toBeDefined();
+    } finally {
+      await server.close();
+    }
+  });
+
   it("accepts a sprint through the API", async () => {
     const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-api-"));
     process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");

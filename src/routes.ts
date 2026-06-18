@@ -3,7 +3,7 @@ import { z } from "zod";
 import { badRequest } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
-import { acceptSprint, createGitHubRepository, createSprint, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, scanProject, updateProjectArtifact, updateValidationReport } from "./projectService.js";
+import { acceptSprint, createGitHubRepository, createSprint, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, updateProjectArtifact, updateValidationReport } from "./projectService.js";
 import { validateIntake } from "./validation.js";
 
 export const router = Router();
@@ -151,8 +151,19 @@ router.post("/projects/:id/sprints/:sprintId/accept", async (request, response, 
   }
 });
 
-router.post("/projects/:id/builder-dry-run", async (request, response, next) => {
+router.post("/projects/:id/patterns/research", async (request, response, next) => {
   try {
+    const project = await getProject(request.params.id);
+    const approved = Boolean(request.body.approved);
+    const query = request.body.query;
+    const result = await researchPatterns(project, approved, query);
+    response.json({ result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/builder-dry-run", async (request, response, next) => {  try {
     const project = await getProject(request.params.id);
     const body = sprintBodySchema.parse(request.body ?? {});
     const sprint = await createSprint(project, body.sprintNumber);
@@ -185,6 +196,20 @@ router.post("/projects/:id/github/setup", async (request, response, next) => {
 
     const result = await createGitHubRepository(project, process.env.GITHUB_TOKEN);
     response.json({ ...result, message: "GitHub repository setup initiated." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/projects/:id/github/status", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const githubConfig = githubConfigStatus();
+    response.json({
+      configured: githubConfig.configured,
+      reason: githubConfig.reason,
+      projectId: project.id
+    });
   } catch (error) {
     next(error);
   }
