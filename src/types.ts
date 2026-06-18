@@ -81,6 +81,7 @@ export interface SprintAcceptanceResult {
   sprintId: string;
   accepted: boolean;
   reportPath: string;
+  logPath?: string;
   commit?: {
     created: boolean;
     hash?: string;

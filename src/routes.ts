@@ -3,7 +3,7 @@ import { z } from "zod";
 import { badRequest } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
-import { acceptSprint, createSprint, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, scanProject, updateProjectArtifact, updateValidationReport } from "./projectService.js";
+import { acceptSprint, createGitHubRepository, createSprint, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, scanProject, updateProjectArtifact, updateValidationReport } from "./projectService.js";
 import { validateIntake } from "./validation.js";
 
 export const router = Router();
@@ -166,6 +166,25 @@ router.get("/projects/:id/git/status", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
     response.json({ status: await gitStatus(project.rootPath), github: githubConfigStatus() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/github/setup", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    if (!process.env.GITHUB_TOKEN) {
+      throw badRequest("GitHub token is not configured.", { env: "GITHUB_TOKEN" });
+    }
+
+    const githubConfig = githubConfigStatus();
+    if (!githubConfig.configured) {
+      throw badRequest(githubConfig.reason || "GitHub is not configured.", { github: githubConfig });
+    }
+
+    const result = await createGitHubRepository(project, process.env.GITHUB_TOKEN);
+    response.json({ ...result, message: "GitHub repository setup initiated." });
   } catch (error) {
     next(error);
   }

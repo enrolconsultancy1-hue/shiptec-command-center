@@ -1,4 +1,5 @@
 import path from "node:path";
+import { Octokit } from "@octokit/rest";
 import { z } from "zod";
 import { artifactExists, readArtifactText, readArtifactTextIfExists, writeArtifact, writeArtifactIfMissing } from "./artifactStore.js";
 import { badRequest, notFound } from "./errors.js";
@@ -73,6 +74,24 @@ export async function initializeProject(input: unknown): Promise<ProjectRecord> 
   await provisionProjectFiles(project);
   await saveProject(project);
   return project;
+}
+
+export async function createGitHubRepository(project: ProjectRecord, token: string): Promise<{ url: string; configured: boolean }> {
+  const octokit = new Octokit({ auth: token });
+  const repoName = project.id;
+
+  try {
+    const { data } = await octokit.repos.createForAuthenticatedUser({
+      name: repoName,
+      description: `Shiptec managed project: ${project.name}`
+    });
+    return { url: data.html_url, configured: true };
+  } catch (error) {
+    return {
+      url: `https://github.com/${process.env.GITHUB_USERNAME || 'user'}/${repoName}`,
+      configured: false
+    };
+  }
 }
 
 export async function getProject(projectId: string): Promise<ProjectRecord> {
@@ -289,25 +308,46 @@ ${parsed.commit ? "yes" : "no"}
       hash: commit.hash,
       message: commit.message
     };
+
+    if (parsed.push) {
+      try {
+        const push = await pushSprint(project.rootPath);
+        result.push = {
+          pushed: true,
+          message: push.message
+        };
+      } catch (error) {
+        result.push = {
+          pushed: false,
+          message: `Failed to push: ${error instanceof Error ? error.message : "Unknown error"}`
+        };
+      }
+    }
+
+    const logPath = await updateProjectArtifact(project, `Sprints/${sprintId}/Implementation_Log.md`, `
+${new Date().toISOString()} - Commit created (hash: ${commit.hash}), Push ${parsed.push ? "attempted" : "skipped"}${result.push?.pushed ? " (success)" : result.push?.pushed === false ? " (failed)" : ""}`);
+    result.logPath = logPath;
   } else if (parsed.commit) {
     result.commit = {
       created: false,
       message: "Local Git commits are disabled for the Firestore backend."
     };
-  }
-
-  if (parsed.push && !useFirestoreBackend()) {
+  } else if (parsed.push && !useFirestoreBackend()) {
     try {
       const push = await pushSprint(project.rootPath);
       result.push = {
         pushed: true,
         message: push.message
       };
+      const logPath = await updateProjectArtifact(project, `Sprints/${sprintId}/Implementation_Log.md`, `${new Date().toISOString()} - Push ${result.push.pushed ? "success" : "failed"}`);
+      result.logPath = logPath;
     } catch (error) {
       result.push = {
         pushed: false,
         message: `Failed to push: ${error instanceof Error ? error.message : "Unknown error"}`
       };
+      const logPath = await updateProjectArtifact(project, `Sprints/${sprintId}/Implementation_Log.md`, `${new Date().toISOString()} - Push failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      result.logPath = logPath;
     }
   } else if (parsed.push) {
     result.push = {
