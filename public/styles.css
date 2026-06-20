@@ -231,6 +231,8 @@ aside.panel {
   gap: 20px;
   overflow-y: auto;
   padding-right: 8px;
+  min-height: 0;
+  flex: 1;
 }
 
 aside.panel::-webkit-scrollbar {

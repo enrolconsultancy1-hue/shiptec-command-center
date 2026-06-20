@@ -306,6 +306,21 @@ async function validate() {
   }
 }
 
+async function generateSpecification() {
+  setPanelLoading(document.querySelector(".panel.command-panel"), true);
+  try {
+    const payload = await request(`/projects/${activeProjectId}/specification/generate`, { method: "POST" });
+    log("Builder Specification generated", payload);
+    showNotification("Builder specification generated successfully", "success", 3000);
+    await scan();
+  } catch (error) {
+    log("Specification generation failed", String(error));
+    showNotification("Specification generation failed: " + String(error), "error", 0);
+  } finally {
+    setPanelLoading(document.querySelector(".panel.command-panel"), false);
+  }
+}
+
 async function dryRun() {
   setPanelLoading(document.querySelector(".panel.command-panel"), true);
   try {
@@ -651,6 +666,7 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       const action = button.dataset.action;
       if (action === "scan") await scan();
       if (action === "validate") await validate();
+      if (action === "generateSpecification") await generateSpecification();
       if (action === "dryRun") await dryRun();
       if (action === "validateDryRun") await validateDryRun();
       if (action === "git") await git();

@@ -94,12 +94,33 @@
           <div class="actions">
             <button type="button" data-action="scan">Scan</button>
             <button type="button" data-action="validate">Validate</button>
+            <button type="button" data-action="generateSpecification">Generate Spec</button>
             <button type="button" data-action="dryRun">Dry Run</button>
             <button type="button" data-action="validateDryRun">Validate Dry Run</button>
             <button type="button" data-action="git">Git Status</button>
             <button type="button" data-action="accept">Accept</button>
             <button type="button" data-action="commit">Commit</button>
             <button type="button" data-action="githubSetup">GitHub Setup</button>
+          </div>
+
+          <div class="insight-panel">
+            <div class="insight-head">
+              <h3>Validation Findings</h3>
+              <span id="findingCount">0</span>
+            </div>
+            <ul id="validationFindings" class="insight-list">
+              <li class="empty">Run validation to review readiness.</li>
+            </ul>
+          </div>
+
+          <div class="insight-panel">
+            <div class="insight-head">
+              <h3>Next Actions</h3>
+              <span id="actionCount">0</span>
+            </div>
+            <ul id="recommendedActions" class="insight-list">
+              <li class="empty">Run scan to see recommended actions.</li>
+            </ul>
           </div>
 
           <div class="summary">
@@ -128,32 +149,13 @@
             </dl>
           </div>
 
-          <div class="insight-panel">
-            <div class="insight-head">
-              <h3>Validation Findings</h3>
-              <span id="findingCount">0</span>
-            </div>
-            <ul id="validationFindings" class="insight-list">
-              <li class="empty">Run validation to review readiness.</li>
-            </ul>
-          </div>
-
-          <div class="insight-panel">
-            <div class="insight-head">
-              <h3>Next Actions</h3>
-              <span id="actionCount">0</span>
-            </div>
-            <ul id="recommendedActions" class="insight-list">
-              <li class="empty">Run scan to see recommended actions.</li>
-            </ul>
-          </div>
-
           <div class="artifact-panel">
             <div class="artifact-head">
               <h3>Artifacts</h3>
               <select id="artifactSelect">
-                <option value="Planning/Architect_Pack.md">Architect Pack</option>
-                <option value="Planning/Technical_Blueprint.md">Technical Blueprint</option>
+               <option value="Planning/Architect_Pack.md">Architect Pack</option>
+               <option value="Planning/Builder_Specification.md">Builder Specification</option>
+               <option value="Planning/Technical_Blueprint.md">Technical Blueprint</option>
                 <option value="Planning/Validation_Report.md">Validation Report</option>
                 <option value="Planning/Governance/Acceptance_Criteria.md">Acceptance Criteria</option>
                 <option value="Sprints/Sprint_001/Sprint_Plan.md">Sprint Plan</option>

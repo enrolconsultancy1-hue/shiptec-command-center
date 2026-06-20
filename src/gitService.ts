@@ -60,6 +60,28 @@ export async function commitSprint(rootPath: string, message: string): Promise<{
   return { hash, message: result.trim() };
 }
 
+export async function setupRemoteRepository(rootPath: string, gitUrl: string): Promise<void> {
+  const git = simpleGit(rootPath);
+  if (!(await git.checkIsRepo())) {
+    await git.init();
+  }
+
+  const remotes = await git.getRemotes();
+  if (!remotes.some(r => r.name === 'origin')) {
+    await git.addRemote('origin', gitUrl);
+  }
+
+  await git.add(".");
+  await git.commit('Factory Initialization: Shiptec managed project');
+  await git.branch(['-M', 'main']);
+  
+  try {
+    await git.push('origin', 'main', ['-u']);
+  } catch (error) {
+    console.error("Failed to push to remote, manual push required:", error);
+  }
+}
+
 export async function pushSprint(rootPath: string): Promise<{ message: string }> {
   const git = simpleGit(rootPath);
   if (!(await git.checkIsRepo())) {

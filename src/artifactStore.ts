@@ -1,8 +1,9 @@
 import { FieldValue } from "firebase-admin/firestore";
+import path from "node:path";
 import { exists, readTextIfExists, safeProjectPath, writeFileIfMissing } from "./fileSystem.js";
 import { firestore, useFirestoreBackend } from "./firebase.js";
 import { ProjectRecord } from "./types.js";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 
 function artifactDocId(relativePath: string): string {
   return encodeURIComponent(relativePath);
@@ -75,6 +76,7 @@ export async function writeArtifactIfMissing(project: ProjectRecord, relativePat
 export async function writeArtifact(project: ProjectRecord, relativePath: string, content: string): Promise<string> {
   if (!useFirestoreBackend()) {
     const target = safeProjectPath(project.rootPath, relativePath);
+    await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, content, "utf8");
     return target;
   }
