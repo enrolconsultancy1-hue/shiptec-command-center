@@ -6,3 +6,7 @@ dist/
 .DS_Store
 coverage/
 server.*.log
+
+# Local Firebase/GCloud credentials
+.firebase-config/
+.gcloud-config/
