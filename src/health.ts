@@ -5,6 +5,28 @@ function hasFile(scan: ProjectScan, relativePath: string): boolean {
   return scan.files.some((file) => file.path === relativePath && file.exists);
 }
 
+const generatedStateFileSuffixes = [
+  "Planning/Builder_Specification.md",
+  "Planning/Governance/Current_State.md",
+  "Planning/Validation_Report.md",
+  "Sprints/Sprint_001/Implementation_Log.md",
+  "Sprints/Sprint_001/Implementation_Log.md.bak"
+];
+
+function hasOnlyGeneratedStateChanges(gitStatus?: GitStatusSummary): boolean {
+  if (!gitStatus?.changedFiles.length) {
+    return false;
+  }
+
+  return gitStatus.changedFiles.every((file) => {
+    const normalizedFile = file.replace(/\\/g, "/");
+
+    return generatedStateFileSuffixes.some((suffix) =>
+      normalizedFile.endsWith(suffix)
+    );
+  });
+}
+
 export async function calculateHealth(scan: ProjectScan, gitStatus?: GitStatusSummary): Promise<HealthScore> {
   let score = 0;
   const reasons: string[] = [];
@@ -56,9 +78,14 @@ export async function calculateHealth(scan: ProjectScan, gitStatus?: GitStatusSu
     reasons.push("Test report exists.");
   }
 
-  if (gitStatus?.isRepo && gitStatus.clean) {
+  if (gitStatus?.isRepo && (gitStatus.clean || hasOnlyGeneratedStateChanges(gitStatus))) {
     score += 5;
-    reasons.push("Git repository is initialized and clean.");
+
+    if (gitStatus.clean) {
+      reasons.push("Git repository is initialized and clean.");
+    } else {
+      reasons.push("Only generated Shiptec state files changed.");
+    }
   } else if (gitStatus?.isRepo) {
     recommendedActions.push("Review current Git changes before sprint acceptance.");
   } else {
