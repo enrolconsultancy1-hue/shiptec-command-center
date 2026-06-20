@@ -4,7 +4,7 @@
   Shiptec Command Center
   
   ## Health Score
-  100/100
+  95/100
   
   ## Status
   Healthy
@@ -14,8 +14,8 @@
   - Git: Changes pending
   
   ## Recommended Next Actions
-  None
+  - Review current Git changes before sprint acceptance.
   
   ## Last Updated
-  2026-06-20T18:43:15.499Z
+  2026-06-20T18:53:35.528Z
   

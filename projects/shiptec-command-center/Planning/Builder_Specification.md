@@ -1,10 +1,10 @@
 # SHIPTEC BUILDER SPECIFICATION (Silicon Valley Level)
 
 ## Generation Metadata
-- GeneratedAt: 2026-06-20T17:46:25.338Z
-- GenerationID: gen-2jwntaejk
+- GeneratedAt: 2026-06-20T18:53:12.230Z
+- GenerationID: gen-95mzwylpf
 - ProjectID: shiptec-command-center
-- Branch: master
+- Branch: main
 - CommitHash: INITIAL_OR_MOCKED_HASH
 
 ---
