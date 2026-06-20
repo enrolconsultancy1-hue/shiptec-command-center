@@ -3,7 +3,7 @@ import { z } from "zod";
 import { badRequest } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
-import { acceptSprint, createGitHubRepository, createSprint, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, updateProjectArtifact, updateValidationReport } from "./projectService.js";
+import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateValidationReport, validateDryRun } from "./projectService.js";
 import { validateIntake } from "./validation.js";
 
 export const router = Router();
@@ -39,7 +39,21 @@ router.get("/projects/:id/scan", async (request, response, next) => {
     const scan = await scanProject(project);
     const status = await gitStatus(project.rootPath);
     const health = await calculateHealth(scan, status);
+    
+    // Auto-update current state whenever a scan is performed
+    await updateCurrentState(project);
+    
     response.json({ scan, health });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/sync-state", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const state = await updateCurrentState(project);
+    response.json({ state });
   } catch (error) {
     next(error);
   }
@@ -141,6 +155,26 @@ router.get("/projects/:id/sprints/:sprintId", async (request, response, next) =>
   }
 });
 
+router.post("/projects/:id/sprints/:sprintId/sync-report", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const report = await syncTestReportFromLog(project, request.params.sprintId);
+    response.json({ report });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/sprints/:sprintId/validate-dry-run", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const validation = await validateDryRun(project, request.params.sprintId);
+    response.json({ validation });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/projects/:id/sprints/:sprintId/accept", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
@@ -163,7 +197,18 @@ router.post("/projects/:id/patterns/research", async (request, response, next) =
   }
 });
 
-router.post("/projects/:id/builder-dry-run", async (request, response, next) => {  try {
+router.post("/projects/:id/specification/generate", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const spec = await generateBuilderSpecification(project);
+    response.json({ spec, message: "Builder Specification compiled successfully." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/builder-dry-run", async (request, response, next) => {
+  try {
     const project = await getProject(request.params.id);
     const body = sprintBodySchema.parse(request.body ?? {});
     const sprint = await createSprint(project, body.sprintNumber);

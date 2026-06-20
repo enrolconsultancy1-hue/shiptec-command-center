@@ -261,6 +261,111 @@ describe("Shiptec API contract", () => {
     }
   });
 
+  it("syncs test report from implementation log", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-api-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "demo-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+
+      // Manually add log entries
+      await postJson(`${server.url}/projects/${initBody.project.id}/artifacts/update?path=Sprints/Sprint_001/Implementation_Log.md`, {
+        content: "[2026-06-18 10:00:00] - TASK: API Init - STATUS: pass - DETAILS: OK\n[2026-06-18 10:05:00] - TASK: Git Init - STATUS: fail - DETAILS: Error"
+      });
+
+      const syncResponse = await postJson(`${server.url}/projects/${initBody.project.id}/sprints/Sprint_001/sync-report`, {});
+      
+      expect(syncResponse.status).toBe(200);
+      const syncBody = await syncResponse.json() as { report: string };
+      expect(syncBody.report).toContain("- [PASS] API Init");
+      expect(syncBody.report).toContain("- [FAIL] Git Init");
+      expect(syncBody.report).toContain("1 passed, 1 failed.");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("validates dry run operations against sprint scope", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-dryrun-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "dryrun-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+
+      // Setup plan and dry run
+      await postJson(`${server.url}/projects/${initBody.project.id}/artifacts/update?path=Sprints/Sprint_001/Sprint_Plan.md`, {
+        content: "## Scope\n- Task A\n- Task B"
+      });
+      await postJson(`${server.url}/projects/${initBody.project.id}/artifacts/update?path=Sprints/Sprint_001/Builder_Dry_Run.md`, {
+        content: "## Intended File Operations\n- Implement Task A\n- Implement Task B"
+      });
+
+      const response = await postJson(`${server.url}/projects/${initBody.project.id}/sprints/Sprint_001/validate-dry-run`, {});
+      expect(response.status).toBe(200);
+      const body = await response.json() as { validation: { status: string; findings: string[] } };
+      expect(body.validation.status).toBe("pass");
+      expect(body.validation.findings[0]).toContain("align with sprint scope");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("automatically updates current state after a scan", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-state-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "state-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+      
+      const scanResponse = await fetch(`${server.url}/projects/${initBody.project.id}/scan`);
+      expect(scanResponse.status).toBe(200);
+
+      const stateResponse = await fetch(`${server.url}/projects/${initBody.project.id}/artifacts?path=Planning/Governance/Current_State.md`);
+      const stateBody = await stateResponse.json() as { artifact: { content: string } };
+      expect(stateBody.artifact.content).toContain("## Health Score");
+      expect(stateBody.artifact.content).toContain("## Status");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("compiles builder dry run/specification successfully", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-spec-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "spec-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+
+      const response = await postJson(`${server.url}/projects/${initBody.project.id}/specification/generate`, {});
+      expect(response.status).toBe(200);
+      const body = await response.json() as { spec: string };
+      expect(body.spec).toContain("# SHIPTEC BUILDER SPECIFICATION");
+      expect(body.spec).toContain("## Generation Metadata");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("accepts a sprint through the API", async () => {
     const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-api-"));
     process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");

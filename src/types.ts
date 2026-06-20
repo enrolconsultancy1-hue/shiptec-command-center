@@ -13,6 +13,7 @@ export interface IntakeInput {
   mvpDefinition: string;
   knownRisks: string[];
   openQuestions: string[];
+  gitUrl?: string;
 }
 
 export interface ProjectRecord {

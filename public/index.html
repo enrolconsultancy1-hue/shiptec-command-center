@@ -16,97 +16,55 @@
         <div class="status-pill" id="serviceStatus">Checking</div>
       </section>
 
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p id="loadingText">Processing...</p>
+      </div>
+
+      <div class="notification-container" id="notificationContainer"></div>
+
       <section class="workspace">
         <form class="panel intake-panel" id="intakeForm">
           <div class="panel-head">
             <h2>Architect Intake</h2>
-            <button type="submit">Initialize</button>
+            <div id="stepIndicator">Step 1 of 5</div>
           </div>
 
-          <label>
-            Project name
-            <input name="projectName" value="Shiptec Command Center" required>
-          </label>
-
-          <label>
-            Project folder
-            <input name="rootPath" value="C:\Users\hp\projects\Shitec\projects\shiptec-command-center" required>
-          </label>
-
-          <label>
-            Product summary
-            <textarea name="productSummary" required>A governed command center that turns software ideas into Architect Packs, validation gates, sprint dry runs, and implementation records.</textarea>
-          </label>
-
-          <label>
-            Business problem
-            <textarea name="businessProblem" required>AI-assisted software work often starts from vague prompts and lacks durable planning, acceptance criteria, and delivery governance.</textarea>
-          </label>
-
-          <div class="grid-two">
-            <label>
-              Target users
-              <textarea name="targetUsers" required>Founder
-Product engineer
-AI builder operator</textarea>
-            </label>
-
-            <label>
-              Success criteria
-              <textarea name="successCriteria" required>Initialize required Shiptec folders
-Generate governance templates
-Create Architect Pack from intake
-Detect validation issues
-Report project health
-Prepare sprint dry run</textarea>
-            </label>
+          <div class="intake-step active" data-step="1">
+            <label>Project name<input name="projectName" value="Shiptec Command Center" required></label>
+            <label>Project folder<input name="rootPath" value="C:\Users\hp\projects\Shitec\projects\shiptec-command-center" required></label>
+            <label>Git Remote URL (optional)<input name="gitUrl" placeholder="https://github.com/user/repo.git"></label>
           </div>
 
-          <label>
-            Current workflow
-            <textarea name="currentWorkflow" required>Users describe ideas in chat and manually track requirements, risks, decisions, and sprint execution.</textarea>
-          </label>
-
-          <label>
-            Desired workflow
-            <textarea name="desiredWorkflow" required>Users complete structured intake, generate planning artifacts, validate readiness, create sprint plans, and execute through Builder dry runs.</textarea>
-          </label>
-
-          <label>
-            MVP definition
-            <textarea name="mvpDefinition" required>A backend API and cockpit that initializes a governed project, generates source-of-truth planning artifacts, validates intake, creates sprint files, and reports health.</textarea>
-          </label>
-
-          <div class="grid-two">
-            <label>
-              Tools and integrations
-              <textarea name="toolsAndIntegrations">Local filesystem
-Git
-GitHub via token when configured</textarea>
-            </label>
-
-            <label>
-              Technical constraints
-              <textarea name="technicalConstraints">Node.js
-TypeScript
-Express
-Markdown artifacts
-No silent overwrites</textarea>
-            </label>
+          <div class="intake-step" data-step="2">
+            <label>Product summary<textarea name="productSummary" required>A governed command center that turns software ideas into Architect Packs, validation gates, sprint dry runs, and implementation records.</textarea></label>
+            <label>Business problem<textarea name="businessProblem" required>AI-assisted software work often starts from vague prompts and lacks durable planning, acceptance criteria, and delivery governance.</textarea></label>
+            <label>Target users<textarea name="targetUsers" required>Founder\nProduct engineer\nAI builder operator</textarea></label>
           </div>
 
-          <div class="grid-two">
-            <label>
-              Known risks
-              <textarea name="knownRisks">GitHub credentials may be missing
-Open questions may block Builder execution
-Generated templates must avoid overwriting user-authored content</textarea>
-            </label>
+          <div class="intake-step" data-step="3">
+            <label>Current workflow<textarea name="currentWorkflow" required>Users describe ideas in chat and manually track requirements, risks, decisions, and sprint execution.</textarea></label>
+            <label>Desired workflow<textarea name="desiredWorkflow" required>Users complete structured intake, generate planning artifacts, validate readiness, create sprint plans, and execute through Builder dry runs.</textarea></label>
+          </div>
 
-            <label>
-              Open questions
-              <textarea name="openQuestions"></textarea>
-            </label>
+          <div class="intake-step" data-step="4">
+            <label>Success criteria<textarea name="successCriteria" required>Initialize required Shiptec folders\nGenerate governance templates\nCreate Architect Pack from intake\nDetect validation issues\nReport project health\nPrepare sprint dry run</textarea></label>
+            <label>MVP definition<textarea name="mvpDefinition" required>A backend API and cockpit that initializes a governed project, generates source-of-truth planning artifacts, validates intake, creates sprint files, and reports health.</textarea></label>
+            <div class="grid-two">
+              <label>Tools and integrations<textarea name="toolsAndIntegrations">Local filesystem\nGit\nGitHub via token when configured</textarea></label>
+              <label>Technical constraints<textarea name="technicalConstraints">Node.js\nTypeScript\nExpress\nMarkdown artifacts\nNo silent overwrites</textarea></label>
+            </div>
+          </div>
+
+          <div class="intake-step" data-step="5">
+            <label>Known risks<textarea name="knownRisks">GitHub credentials may be missing\nOpen questions may block Builder execution\nGenerated templates must avoid overwriting user-authored content</textarea></label>
+            <label>Open questions<textarea name="openQuestions"></textarea></label>
+          </div>
+
+          <div class="wizard-actions">
+            <button type="button" id="prevStep" disabled>Back</button>
+            <button type="button" id="nextStep">Next</button>
+            <button type="submit" id="submitIntake" style="display: none;">Initialize Project</button>
           </div>
         </form>
 
@@ -137,9 +95,11 @@ Generated templates must avoid overwriting user-authored content</textarea>
             <button type="button" data-action="scan">Scan</button>
             <button type="button" data-action="validate">Validate</button>
             <button type="button" data-action="dryRun">Dry Run</button>
+            <button type="button" data-action="validateDryRun">Validate Dry Run</button>
             <button type="button" data-action="git">Git Status</button>
             <button type="button" data-action="accept">Accept</button>
             <button type="button" data-action="commit">Commit</button>
+            <button type="button" data-action="githubSetup">GitHub Setup</button>
           </div>
 
           <div class="summary">
@@ -202,6 +162,16 @@ Generated templates must avoid overwriting user-authored content</textarea>
               </select>
             </div>
             <button type="button" data-action="artifact">View Artifact</button>
+            <button type="button" id="toggleArtifactView">Show More</button>
+            <button type="button" data-action="editArtifact">Edit Artifact</button>
+            <button type="button" data-action="previewUpdate">Preview Update</button>
+            <div id="artifactEditForm" class="artifact-edit-form">
+              <textarea id="artifactEditText"></textarea>
+              <div class="form-actions">
+                <button type="button" id="saveArtifactEdit" class="btn-primary">Save</button>
+                <button type="button" id="cancelArtifactEdit" class="btn-secondary">Cancel</button>
+              </div>
+            </div>
             <pre id="artifactView">Select an artifact.</pre>
           </div>
 

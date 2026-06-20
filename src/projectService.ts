@@ -5,7 +5,8 @@ import { artifactExists, readArtifactText, readArtifactTextIfExists, writeArtifa
 import { badRequest, notFound } from "./errors.js";
 import { ProjectRecord, ProjectScan, SprintAcceptanceInput, SprintAcceptanceResult, SprintArtifacts, SprintRecord } from "./types.js";
 import { saveProject, findProject, readProjects } from "./projectStore.js";
-import { commitSprint, pushSprint } from "./gitService.js";
+import { commitSprint, pushSprint, gitStatus, setupRemoteRepository } from "./gitService.js";
+import { calculateHealth } from "./health.js";
 import { useFirestoreBackend } from "./firebase.js";
 import {
   acceptanceCriteriaTemplate,
@@ -42,7 +43,8 @@ export const intakeSchema = z.object({
   successCriteria: z.array(z.string().min(1)),
   mvpDefinition: z.string().min(1),
   knownRisks: z.array(z.string()).default([]),
-  openQuestions: z.array(z.string()).default([])
+  openQuestions: z.array(z.string()).default([]),
+  gitUrl: z.string().url().optional().or(z.literal(""))
 });
 
 const initSchema = z.object({
@@ -56,6 +58,141 @@ const acceptanceSchema = z.object({
   commit: z.boolean().optional().default(false),
   push: z.boolean().optional().default(false)
 });
+
+export async function updateCurrentState(project: ProjectRecord): Promise<string> {
+  const scan = await scanProject(project);
+  const status = await gitStatus(project.rootPath);
+  const health = await calculateHealth(scan, status);
+
+  const state = `# Current State
+  
+  ## Project
+  ${project.name}
+  
+  ## Health Score
+  ${health.score}/100
+  
+  ## Status
+  ${health.score >= 90 ? "Healthy" : health.score >= 70 ? "Warning" : "Critical"}
+  
+  ## Latest Scan
+  - Required files: ${scan.missingFiles.length === 0 ? "All present" : `${scan.missingFiles.length} missing`}
+  - Git: ${status.isRepo ? (status.clean ? "Clean" : "Changes pending") : "Not a repo"}
+  
+  ## Recommended Next Actions
+  ${health.recommendedActions.map((a: string) => `- ${a}`).join("\n") || "None"}
+  
+  ## Last Updated
+  ${new Date().toISOString()}
+  `;
+
+
+  await writeArtifact(project, "Planning/Governance/Current_State.md", state);
+  return state;
+}
+
+export async function generateBuilderSpecification(project: ProjectRecord): Promise<string> {
+  const architectPack = await readArtifactTextIfExists(project, "Planning/Architect_Pack.md") || "Missing Architect Pack";
+  const blueprint = await readArtifactTextIfExists(project, "Planning/Technical_Blueprint.md") || "Missing Technical Blueprint";
+  const openQuestions = await readArtifactTextIfExists(project, "Planning/Governance/Open_Questions.md") || "No unresolved open questions.";
+
+  // Get workspace level NEXT_TASK.md
+  let nextTask = "No next task defined.";
+  try {
+    const fs = await import("node:fs/promises");
+    nextTask = await fs.readFile(path.join("C:\\Users\\hp\\projects\\Shitec", "NEXT_TASK.md"), "utf8");
+  } catch {
+    // Fallback to local next task if workspace level is missing
+  }
+
+  // Get Repository Snapshot & Git Metadata
+  const status = await gitStatus(project.rootPath);
+  const branch = status.currentBranch || "master";
+  const commitHash = "INITIAL_OR_MOCKED_HASH";
+
+  const fileTree: string[] = [];
+  try {
+    const fs = await import("node:fs/promises");
+    const scanDir = async (dir: string, depth = 0) => {
+      if (depth > 2) return;
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".shiptec") continue;
+        const fullPath = path.join(dir, entry.name);
+        fileTree.push(`${"  ".repeat(depth)}- ${entry.name}`);
+        if (entry.isDirectory()) {
+          await scanDir(fullPath, depth + 1);
+        }
+      }
+    };
+    if (!useFirestoreBackend()) {
+      await scanDir(project.rootPath);
+    } else {
+      fileTree.push("- Firestore Virtual Storage active; no local directory tree.");
+    }
+  } catch (err) {
+    fileTree.push(`- Failed to scan repository: ${err instanceof Error ? err.message : "Unknown error"}`);
+  }
+
+  const generationId = `gen-${Math.random().toString(36).substr(2, 9)}`;
+  const spec = `# SHIPTEC BUILDER SPECIFICATION (Silicon Valley Level)
+
+## Generation Metadata
+- GeneratedAt: ${new Date().toISOString()}
+- GenerationID: ${generationId}
+- ProjectID: ${project.id}
+- Branch: ${branch}
+- CommitHash: ${commitHash}
+
+---
+
+## 1. Source of Truth Hierarchy
+1. Technical_Blueprint.md
+2. Architect_Pack.md
+3. NEXT_TASK.md
+4. Governance/*
+5. Existing repository
+
+*Mandate:* Anything outside these sources is strictly forbidden. Never invent APIs, routes, tables, schemas, or requirements. Unknown items must be written to Governance/Open_Questions.md.
+
+---
+
+## 2. NEXT_TASK
+${nextTask}
+
+---
+
+## 3. Architect Pack Context
+${architectPack}
+
+---
+
+## 4. Technical Blueprint
+${blueprint}
+
+---
+
+## 5. Unresolved Open Questions
+${openQuestions}
+
+---
+
+## 6. Repository Snapshot
+\`\`\`text
+${fileTree.join("\n")}
+\`\`\`
+
+---
+
+## 7. Change Budget & Execution Rules
+- Limit implementation: Max 5 files modified, max 2 files created, max 500 lines changed.
+- Exceeding limits requires immediate STOP and explanation to Governance/Open_Questions.md.
+- A Builder MUST NOT immediately generate code. A Dry Run is required first.
+`;
+
+  await writeArtifact(project, "Planning/Builder_Specification.md", spec);
+  return spec;
+}
 
 export async function initializeProject(input: unknown): Promise<ProjectRecord> {
   const parsed = initSchema.parse(input);
@@ -73,6 +210,11 @@ export async function initializeProject(input: unknown): Promise<ProjectRecord> 
 
   await provisionProjectFiles(project);
   await saveProject(project);
+
+  if (parsed.intake.gitUrl) {
+    await setupRemoteRepository(rootPath, parsed.intake.gitUrl);
+  }
+
   return project;
 }
 
@@ -209,7 +351,8 @@ function getAllowedArtifactPaths(): string[] {
     "Sprints/Sprint_001/Sprint_Plan.md",
     "Sprints/Sprint_001/Builder_Dry_Run.md",
     "Sprints/Sprint_001/Implementation_Log.md",
-    "Sprints/Sprint_001/Test_Report.md"
+    "Sprints/Sprint_001/Test_Report.md",
+    "Planning/Builder_Specification.md"
   ];
 }
 
@@ -245,7 +388,47 @@ export async function researchPatterns(project: ProjectRecord, approved: boolean
   return { notes: finalNotes, source: "github-search" };
 }
 
-export async function createSprint(project: ProjectRecord, sprintNumber: number): Promise<SprintRecord> {  if (!Number.isInteger(sprintNumber) || sprintNumber < 1 || sprintNumber > 999) {
+export async function validateDryRun(project: ProjectRecord, sprintId: string): Promise<{ status: string; findings: string[] }> {
+  const planContent = await readArtifactTextIfExists(project, `Sprints/${sprintId}/Sprint_Plan.md`);
+  const dryRunContent = await readArtifactTextIfExists(project, `Sprints/${sprintId}/Builder_Dry_Run.md`);
+
+  if (!planContent || !dryRunContent) {
+    return { status: "fail", findings: ["Either Sprint Plan or Builder Dry Run is missing."] };
+  }
+
+  const findings: string[] = [];
+  let status = "pass";
+
+  const scopeSection = planContent.split("## Scope")[1]?.split("##")[0] || "";
+  const opsSection = dryRunContent.split("## Intended File Operations")[1]?.split("##")[0] || "";
+
+  if (!opsSection.trim()) {
+    status = "fail";
+    findings.push("No intended file operations defined in the Dry Run.");
+  } else if (opsSection.length < 20) {
+    status = "warning";
+    findings.push("Intended file operations are too brief; ensure all scope items are covered.");
+  } else {
+    // Simple check: ensure some keywords from scope are in the ops section
+    const scopeItems = scopeSection.split("\n").filter(l => l.trim().startsWith("-"));
+    const matched = scopeItems.filter(item => {
+      const keyword = item.replace("-", "").trim().toLowerCase().split(" ")[0];
+      return opsSection.toLowerCase().includes(keyword);
+    });
+
+    if (matched.length < scopeItems.length / 2) {
+      status = "warning";
+      findings.push(`Only ${matched.length}/${scopeItems.length} scope items appear to be addressed in the dry run.`);
+    }
+  }
+
+  if (status === "pass") findings.push("Dry run operations align with sprint scope.");
+
+  return { status, findings };
+}
+
+export async function createSprint(project: ProjectRecord, sprintNumber: number): Promise<SprintRecord> {
+  if (!Number.isInteger(sprintNumber) || sprintNumber < 1 || sprintNumber > 999) {
     throw badRequest("Sprint number must be an integer from 1 to 999.", { sprintNumber });
   }
 
@@ -394,6 +577,37 @@ export async function updateValidationReport(project: ProjectRecord): Promise<st
   const markdown = reportMarkdown(validateIntake(project.intake));
   await writeArtifact(project, "Planning/Validation_Report.md", markdown);
   return markdown;
+}
+
+export async function syncTestReportFromLog(project: ProjectRecord, sprintId: string): Promise<string> {
+  const logContent = await readArtifactTextIfExists(project, `Sprints/${sprintId}/Implementation_Log.md`);
+  if (!logContent) {
+    throw notFound(`Implementation log not found for sprint: ${sprintId}`);
+  }
+
+  const lines = logContent.split("\n");
+  const reportLines = ["# Test Report", "", "## Summary", ""];
+  
+  let passed = 0;
+  let failed = 0;
+
+  for (const line of lines) {
+    if (line.includes("- STATUS: pass")) {
+      passed++;
+      const task = line.split("- TASK:")[1]?.split("- STATUS:")[0]?.trim() || line;
+      reportLines.push(`- [PASS] ${task}`);
+    } else if (line.includes("- STATUS: fail")) {
+      failed++;
+      const task = line.split("- TASK:")[1]?.split("- STATUS:")[0]?.trim() || line;
+      reportLines.push(`- [FAIL] ${task}`);
+    }
+  }
+
+  reportLines.push("", `## Result`, `${passed} passed, ${failed} failed.`);
+
+  const report = reportLines.join("\n");
+  await writeArtifact(project, `Sprints/${sprintId}/Test_Report.md`, report);
+  return report;
 }
 
 function reportMarkdown(report: ReturnType<typeof validateIntake>): string {
