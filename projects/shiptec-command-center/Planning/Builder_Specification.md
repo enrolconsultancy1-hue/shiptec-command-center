@@ -1,8 +1,8 @@
 # SHIPTEC BUILDER SPECIFICATION (Silicon Valley Level)
 
 ## Generation Metadata
-- GeneratedAt: 2026-06-20T13:49:20.099Z
-- GenerationID: gen-t2xxvu63s
+- GeneratedAt: 2026-06-20T14:30:59.223Z
+- GenerationID: gen-nw68culhm
 - ProjectID: shiptec-command-center
 - Branch: master
 - CommitHash: INITIAL_OR_MOCKED_HASH
@@ -193,6 +193,7 @@ A backend API and cockpit that initializes a governed project, generates source-
     - Acceptance_Report.md
     - Builder_Dry_Run.md
     - Implementation_Log.md
+    - Implementation_Log.md.bak
     - Sprint_Plan.md
     - Test_Report.md
 ```
