@@ -44,7 +44,9 @@ export const intakeSchema = z.object({
   mvpDefinition: z.string().min(1),
   knownRisks: z.array(z.string()).default([]),
   openQuestions: z.array(z.string()).default([]),
-  gitUrl: z.string().url().optional().or(z.literal(""))
+  gitUrl: z.string().url().optional().or(z.literal("")),
+  skillsUrl: z.string().url().optional().or(z.literal("")),
+  knowledgeUrl: z.string().url().optional().or(z.literal("")),
 });
 
 const initSchema = z.object({
@@ -135,59 +137,52 @@ export async function generateBuilderSpecification(project: ProjectRecord): Prom
   }
 
   const generationId = `gen-${Math.random().toString(36).substr(2, 9)}`;
-  const spec = `# SHIPTEC BUILDER SPECIFICATION (Silicon Valley Level)
-
-## Generation Metadata
-- GeneratedAt: ${new Date().toISOString()}
-- GenerationID: ${generationId}
-- ProjectID: ${project.id}
-- Branch: ${branch}
-- CommitHash: ${commitHash}
+  const spec = `# 📦 SHIPTEC HANDOFF SPEC [V2-OPTIMIZED]
+  
+## 🆔 METADATA
+- ID: ${generationId} | Date: ${new Date().toISOString()}
+- Project: ${project.id} | Branch: ${branch} | Hash: ${commitHash}
 
 ---
 
-## 1. Source of Truth Hierarchy
-1. Technical_Blueprint.md
-2. Architect_Pack.md
-3. NEXT_TASK.md
-4. Governance/*
-5. Existing repository
+## 🎯 SOURCE-OF-TRUTH (SOT) HIERARCHY
+1. Technical_Blueprint.md (Hard Constraints)
+2. Architect_Pack.md (Intent)
+3. NEXT_TASK.md (Immediate Goal)
+4. Governance/* (Acceptance/Risks)
 
-*Mandate:* Anything outside these sources is strictly forbidden. Never invent APIs, routes, tables, schemas, or requirements. Unknown items must be written to Governance/Open_Questions.md.
+*MANDATE: No inventing. If SOT is silent, write to Governance/Open_Questions.md. STOP immediately if constraints are breached.*
 
 ---
 
-## 2. NEXT_TASK
+## 🚀 CURRENT TARGET (NEXT_TASK)
 ${nextTask}
 
 ---
 
-## 3. Architect Pack Context
+## 🛠 CONTEXT STACK
+### [A] Architect Pack
 ${architectPack}
 
----
-
-## 4. Technical Blueprint
+### [B] Technical Blueprint
 ${blueprint}
 
----
-
-## 5. Unresolved Open Questions
+### [C] Unresolved Blockers
 ${openQuestions}
 
 ---
 
-## 6. Repository Snapshot
+## 📂 REPO SNAPSHOT
 \`\`\`text
 ${fileTree.join("\n")}
 \`\`\`
 
 ---
 
-## 7. Change Budget & Execution Rules
-- Limit implementation: Max 5 files modified, max 2 files created, max 500 lines changed.
-- Exceeding limits requires immediate STOP and explanation to Governance/Open_Questions.md.
-- A Builder MUST NOT immediately generate code. A Dry Run is required first.
+## ⚠️ EXECUTION BUDGET & GUARDS
+- MOD_LIMIT: Max 5 files modified / 2 files created / 500 lines total.
+- FLOW: Dry Run $\rightarrow$ Architect Approval $\rightarrow$ Implementation.
+- GUARD: Exceeding budget = IMMEDIATE STOP.
 `;
 
   await writeArtifact(project, "Planning/Builder_Specification.md", spec);

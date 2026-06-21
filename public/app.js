@@ -108,7 +108,9 @@ function intakePayload() {
       mvpDefinition: data.get("mvpDefinition"),
       knownRisks: lines(data.get("knownRisks") || ""),
       openQuestions: lines(data.get("openQuestions") || ""),
-      gitUrl: data.get("gitUrl") || undefined
+      gitUrl: data.get("gitUrl") || undefined,
+      skillsUrl: data.get("skillsUrl") || undefined,
+      knowledgeUrl: data.get("knowledgeUrl") || undefined
     }
   };
 }
@@ -126,12 +128,64 @@ function setActiveProject(projectId) {
   if (projectSelect && projectSelect.value !== projectId) {
     projectSelect.value = projectId;
   }
+  updateArtifactSelectOptions();
 }
 
 function setActiveSprint(sprintId) {
   activeSprintId = sprintId;
   if (sprintSelect && sprintSelect.value !== sprintId) {
     sprintSelect.value = sprintId;
+  }
+  updateArtifactSelectOptions();
+}
+
+function updateArtifactSelectOptions() {
+  if (!artifactSelect) return;
+  
+  const previousValue = artifactSelect.value;
+  
+  const options = [
+    { value: "Planning/Architect_Pack.md", label: "Architect Pack" },
+    { value: "Planning/Builder_Specification.md", label: "Builder Specification" },
+    { value: "Planning/Technical_Blueprint.md", label: "Technical Blueprint" },
+    { value: "Planning/Handoff_Prompt.md", label: "Handoff Prompt" },
+    { value: "Planning/Validation_Report.md", label: "Validation Report" },
+    { value: "Planning/Governance/Acceptance_Criteria.md", label: "Acceptance Criteria" },
+    { value: "Planning/Governance/Current_State.md", label: "Current State" },
+    { value: "Planning/Governance/Decisions.md", label: "Decisions" },
+    { value: "Planning/Governance/Risks.md", label: "Risks" },
+    { value: "Planning/Governance/Open_Questions.md", label: "Open Questions" },
+    { value: `Sprints/${activeSprintId}/Sprint_Plan.md`, label: "Sprint Plan" },
+    { value: `Sprints/${activeSprintId}/Builder_Dry_Run.md`, label: "Builder Dry Run" },
+    { value: `Sprints/${activeSprintId}/Implementation_Log.md`, label: "Implementation Log" },
+    { value: `Sprints/${activeSprintId}/Test_Report.md`, label: "Test Report" },
+    { value: `Sprints/${activeSprintId}/Acceptance_Report.md`, label: "Acceptance Report" },
+    { value: "Docs/Product_Requirements.md", label: "Product Requirements" },
+    { value: "Docs/User_Roles.md", label: "User Roles" },
+    { value: "Docs/Methodology_Guide.md", label: "Methodology Guide" },
+    { value: "Docs/System_Tools.md", label: "System Tools" },
+    { value: "Docs/Success_Criteria.md", label: "Success Criteria" }
+  ];
+
+  artifactSelect.innerHTML = "";
+  for (const opt of options) {
+    const option = document.createElement("option");
+    option.value = opt.value;
+    option.textContent = opt.label;
+    artifactSelect.append(option);
+  }
+
+  let restoredValue = previousValue;
+  if (previousValue && previousValue.startsWith("Sprints/")) {
+    const parts = previousValue.split("/");
+    if (parts.length === 3) {
+      restoredValue = `Sprints/${activeSprintId}/${parts[2]}`;
+    }
+  }
+  
+  artifactSelect.value = restoredValue;
+  if (!artifactSelect.value) {
+    artifactSelect.selectedIndex = 0;
   }
 }
 
@@ -244,6 +298,7 @@ async function loadProjects() {
       }
     }
     setActiveProject(payload.projects[payload.projects.length - 1].id);
+    updateArtifactSelectOptions();
     await scan();
     await git();
     await getGitHubStatus();
@@ -301,6 +356,38 @@ async function validate() {
   } catch (error) {
     log("Validation failed", String(error));
     showNotification("Validation failed: " + String(error), "error", 0);
+  } finally {
+    setPanelLoading(document.querySelector(".panel.command-panel"), false);
+  }
+}
+
+async function createHandoff() {
+  setPanelLoading(document.querySelector(".panel.command-panel"), true);
+  try {
+    const payload = await request(`/projects/${activeProjectId}/handoff`, { method: "POST" });
+    log("Handoff Package Created", payload);
+    showNotification("Handoff package created in .shiptec-handoff folder", "success", 3000);
+  } catch (error) {
+    log("Handoff failed", String(error));
+    showNotification("Handoff failed: " + String(error), "error", 0);
+  } finally {
+    setPanelLoading(document.querySelector(".panel.command-panel"), false);
+  }
+}
+
+async function applySpec() {
+  setPanelLoading(document.querySelector(".panel.command-panel"), true);
+  try {
+    const payload = await request(`/projects/${activeProjectId}/builder/apply`, {
+      method: "POST",
+      body: JSON.stringify({ sprintId: activeSprintId })
+    });
+    log("Builder Spec Applied", payload);
+    showNotification("Builder specification applied successfully", "success", 3000);
+    await scan();
+  } catch (error) {
+    log("Apply Spec failed", String(error));
+    showNotification("Apply Spec failed: " + String(error), "error", 0);
   } finally {
     setPanelLoading(document.querySelector(".panel.command-panel"), false);
   }
@@ -667,6 +754,8 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       if (action === "scan") await scan();
       if (action === "validate") await validate();
       if (action === "generateSpecification") await generateSpecification();
+      if (action === "applySpec") await applySpec();
+      if (action === "createHandoff") await createHandoff();
       if (action === "dryRun") await dryRun();
       if (action === "validateDryRun") await validateDryRun();
       if (action === "git") await git();
@@ -683,4 +772,7 @@ document.querySelectorAll("[data-action]").forEach((button) => {
   });
 });
 
-checkHealth().then(loadProjects);
+checkHealth().then(async () => {
+  await loadProjects();
+  updateArtifactSelectOptions();
+});

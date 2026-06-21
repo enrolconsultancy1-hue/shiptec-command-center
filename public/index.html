@@ -50,10 +50,14 @@
           <div class="intake-step" data-step="4">
             <label>Success criteria<textarea name="successCriteria" required>Initialize required Shiptec folders\nGenerate governance templates\nCreate Architect Pack from intake\nDetect validation issues\nReport project health\nPrepare sprint dry run</textarea></label>
             <label>MVP definition<textarea name="mvpDefinition" required>A backend API and cockpit that initializes a governed project, generates source-of-truth planning artifacts, validates intake, creates sprint files, and reports health.</textarea></label>
-            <div class="grid-two">
-              <label>Tools and integrations<textarea name="toolsAndIntegrations">Local filesystem\nGit\nGitHub via token when configured</textarea></label>
-              <label>Technical constraints<textarea name="technicalConstraints">Node.js\nTypeScript\nExpress\nMarkdown artifacts\nNo silent overwrites</textarea></label>
-            </div>
+          <div class="grid-two">
+            <label>Tools and integrations<textarea name="toolsAndIntegrations">Local filesystem\nGit\nGitHub via token when configured</textarea></label>
+            <label>Technical constraints<textarea name="technicalConstraints">Node.js\nTypeScript\nExpress\nMarkdown artifacts\nNo silent overwrites</textarea></label>
+          </div>
+          <div class="grid-two">
+            <label>Verified Skills URL (e.g. Claude Code UI/UX)<input name="skillsUrl" placeholder="https://github.com/..."></label>
+            <label>Knowledge Projects URL (Reference Projects)<input name="knowledgeUrl" placeholder="https://github.com/..."></label>
+          </div>
           </div>
 
           <div class="intake-step" data-step="5">
@@ -74,12 +78,23 @@
             <span id="projectId">shiptec-command-center</span>
           </div>
 
-          <label class="project-picker">
-            Known projects
-            <select id="projectSelect">
-              <option value="shiptec-command-center">shiptec-command-center</option>
-            </select>
-          </label>
+          <div class="grid-two" style="margin-bottom: 12px;">
+            <label class="project-picker">
+              Known projects
+              <select id="projectSelect">
+                <option value="shiptec-command-center">shiptec-command-center</option>
+              </select>
+            </label>
+
+            <label class="sprint-picker">
+              Active Sprint
+              <select id="sprintSelect">
+                <option value="Sprint_001">Sprint 001</option>
+                <option value="Sprint_002">Sprint 002</option>
+                <option value="Sprint_003">Sprint 003</option>
+              </select>
+            </label>
+          </div>
 
           <div class="health-meter">
             <div>
@@ -95,6 +110,8 @@
             <button type="button" data-action="scan">Scan</button>
             <button type="button" data-action="validate">Validate</button>
             <button type="button" data-action="generateSpecification">Generate Spec</button>
+            <button type="button" data-action="applySpec">Apply Spec</button>
+            <button type="button" data-action="createHandoff">Create Handoff</button>
             <button type="button" data-action="dryRun">Dry Run</button>
             <button type="button" data-action="validateDryRun">Validate Dry Run</button>
             <button type="button" data-action="git">Git Status</button>

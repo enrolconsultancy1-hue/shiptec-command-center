@@ -359,8 +359,8 @@ describe("Shiptec API contract", () => {
       const response = await postJson(`${server.url}/projects/${initBody.project.id}/specification/generate`, {});
       expect(response.status).toBe(200);
       const body = await response.json() as { spec: string };
-      expect(body.spec).toContain("# SHIPTEC BUILDER SPECIFICATION");
-      expect(body.spec).toContain("## Generation Metadata");
+      expect(body.spec).toContain("# 📦 SHIPTEC HANDOFF SPEC [V2-OPTIMIZED]");
+      expect(body.spec).toContain("## 🆔 METADATA");
     } finally {
       await server.close();
     }

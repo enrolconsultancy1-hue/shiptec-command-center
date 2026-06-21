@@ -4,6 +4,8 @@ import { badRequest } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
 import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateValidationReport, validateDryRun } from "./projectService.js";
+import { applyBuilderSpecification } from "./builderService.js";
+import { createHandoffPackage } from "./handoffService.js";
 import { validateIntake } from "./validation.js";
 
 export const router = Router();
@@ -192,6 +194,27 @@ router.post("/projects/:id/patterns/research", async (request, response, next) =
     const query = request.body.query;
     const result = await researchPatterns(project, approved, query);
     response.json({ result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/builder/apply", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const sprintId = String(request.body.sprintId ?? "Sprint_002");
+    const result = await applyBuilderSpecification(project, sprintId);
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/handoff", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const result = await createHandoffPackage(project);
+    response.json({ ...result, message: "Handoff package created in .shiptec-handoff folder." });
   } catch (error) {
     next(error);
   }

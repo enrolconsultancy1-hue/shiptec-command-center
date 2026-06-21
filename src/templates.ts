@@ -94,7 +94,7 @@ ${list(intake.technicalConstraints)}
 
 export function architectPackTemplate(intake: IntakeInput): string {
   return `# Architect Pack
-
+  
 ## Product Intent
 ${intake.productSummary}
 
@@ -119,6 +119,10 @@ ${list(intake.toolsAndIntegrations)}
 ## Constraints
 ${list(intake.technicalConstraints)}
 
+## Skills & Knowledge Sources
+- **Verified Skills:** ${intake.skillsUrl || "None provided"}
+- **Reference Projects (Knowledge):** ${intake.knowledgeUrl || "None provided"}
+
 ## Risks
 ${list(intake.knownRisks)}
 
@@ -129,7 +133,7 @@ ${list(intake.openQuestions)}
 
 export function technicalBlueprintTemplate(intake: IntakeInput): string {
   return `# Technical Blueprint
-
+  
 ## Default Stack
 - Node.js
 - TypeScript
@@ -143,6 +147,10 @@ export function technicalBlueprintTemplate(intake: IntakeInput): string {
 - Domain services perform validation, health scoring, sprint planning, and file provisioning.
 - Filesystem service owns all project artifact writes.
 - Git service owns local Git and GitHub readiness checks.
+
+## Knowledge Base & Skills Reference
+- **Implementation Skills:** ${intake.skillsUrl || "Use standard industry patterns"}
+- **Customization Knowledge:** ${intake.knowledgeUrl || "Based on provided product requirements"}
 
 ## Project Constraints
 ${list(intake.technicalConstraints)}

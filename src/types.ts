@@ -14,6 +14,8 @@ export interface IntakeInput {
   knownRisks: string[];
   openQuestions: string[];
   gitUrl?: string;
+  skillsUrl?: string;
+  knowledgeUrl?: string;
 }
 
 export interface ProjectRecord {
