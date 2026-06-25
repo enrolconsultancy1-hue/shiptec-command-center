@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { Server } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,6 +8,7 @@ import { calculateHealth } from "../src/health.js";
 import { gitStatus } from "../src/gitService.js";
 import { acceptSprint, initializeProject, readProjectArtifact, scanProject } from "../src/projectService.js";
 import { validateIntake } from "../src/validation.js";
+import { exportHandoffPackage } from "../src/handoffService.js";
 
 const intake = {
   projectName: "Demo Factory",
@@ -386,6 +387,89 @@ describe("Shiptec API contract", () => {
       expect(acceptResponse.status).toBe(200);
       const acceptBody = await acceptResponse.json() as { acceptance: { accepted: boolean } };
       expect(acceptBody.acceptance.accepted).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("fetches the project directory tree structure", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-api-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "demo-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+
+      const treeResponse = await fetch(`${server.url}/projects/${initBody.project.id}/tree`);
+      expect(treeResponse.status).toBe(200);
+      const treeBody = await treeResponse.json() as { projectId: string; tree: any[] };
+      expect(treeBody.projectId).toBe(initBody.project.id);
+      expect(Array.isArray(treeBody.tree)).toBe(true);
+      // It should contain the initial files/folders created by init
+      expect(treeBody.tree.length).toBeGreaterThan(0);
+      expect(treeBody.tree.some((node) => node.name === "Planning")).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("exports handoff package as a folder for a specific editor", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-api-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "demo-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+
+      const exportDest = path.join(workspace, "exported-handoff");
+      const exportResponse = await postJson(`${server.url}/projects/${initBody.project.id}/handoff/export`, {
+        format: "folder",
+        editor: "claudecode",
+        destinationPath: exportDest
+      });
+
+      expect(exportResponse.status).toBe(200);
+      const exportBody = await exportResponse.json() as { destinationPath: string; filesIncluded: string[] };
+      expect(exportBody.destinationPath).toBe(exportDest);
+      expect(exportBody.filesIncluded).toContain("HANDOFF_GUIDE.md");
+
+      // Verify the files exist at the destination
+      const guideContent = await readFile(path.join(exportDest, "HANDOFF_GUIDE.md"), "utf-8");
+      expect(guideContent).toContain("Claude Code-Specific Workflow");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("exports handoff package as a zip archive", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-api-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "demo-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+
+      const exportResponse = await postJson(`${server.url}/projects/${initBody.project.id}/handoff/export`, {
+        format: "zip",
+        editor: "antigravity"
+      });
+
+      expect(exportResponse.status).toBe(200);
+      expect(exportResponse.headers.get("content-type")).toBe("application/zip");
+      const buffer = await exportResponse.arrayBuffer();
+      expect(buffer.byteLength).toBeGreaterThan(0);
     } finally {
       await server.close();
     }

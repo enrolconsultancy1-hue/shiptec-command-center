@@ -1,7 +1,7 @@
 # 📦 SHIPTEC HANDOFF SPEC [V2-OPTIMIZED]
   
 ## 🆔 METADATA
-- ID: gen-e9orpvwa4 | Date: 2026-06-21T14:06:36.473Z
+- ID: gen-st28cyxlx | Date: 2026-06-22T10:09:43.604Z
 - Project: shiptec-command-center | Branch: main | Hash: INITIAL_OR_MOCKED_HASH
 
 ---
@@ -140,6 +140,14 @@ A backend API and cockpit that initializes a governed project, generates source-
 
 ## 📂 REPO SNAPSHOT
 ```text
+- .shiptec-handoff
+  - Acceptance_Criteria.md
+  - Architect_Pack.md
+  - Builder_Specification.md
+  - Current_State.md
+  - HANDOFF_GUIDE.md
+  - HANDOFF_SUMMARY.txt
+  - Technical_Blueprint.md
 - Docs
   - Methodology_Guide.md
   - Product_Requirements.md

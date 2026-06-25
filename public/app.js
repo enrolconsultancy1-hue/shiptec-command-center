@@ -36,6 +36,47 @@ if (toggleArtifactViewBtn && artifactView) {
 
 let activeProjectId = "shiptec-command-center";
 let activeSprintId = "Sprint_001";
+let selectedEditor = "antigravity"; 
+
+function selectEditor(editor) {
+  selectedEditor = editor;
+  document.querySelectorAll('.target-editor-panel .editor-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.editor === editor);
+  });
+  showNotification(`Target editor set to ${editor}`, "info", 1000);
+}
+let currentProjectStatus = 'fresh';
+
+const PROJECT_STATES = {
+  fresh: { label: "Initialize Project", icon: "🚀", color: "#0080ff", tooltip: "No project record yet" },
+  initialized: { label: "Initialize Project", icon: "🚀", color: "#0080ff", tooltip: "Project already initialized; clicking will re-provision" },
+  in_progress: { label: "In Progress", icon: "⚡", color: "#f59e0b", tooltip: "Active sprint work committed or accepted" },
+  handed_over: { label: "Handed Over", icon: "🏁", color: "#00f0ff", tooltip: "Handoff package created" },
+  re_initializing: { label: "Re-Initialize", icon: "♻", color: "#ff8c00", tooltip: "Re-initializing existing project" }
+};
+
+function updateSubmitButton(status, statusUpdatedAt) {
+  currentProjectStatus = status;
+  const btn = document.querySelector("#submitIntake");
+  const badge = document.querySelector("#projectStatusBadge");
+  if (!btn) return;
+
+  btn.setAttribute("data-state", status);
+
+  const stateConfig = PROJECT_STATES[status] || PROJECT_STATES.fresh;
+  btn.innerHTML = `${stateConfig.icon} ${stateConfig.label}`;
+
+  if (status !== "fresh" && badge) {
+    badge.classList.remove("hidden");
+    const dateStr = statusUpdatedAt ? new Date(statusUpdatedAt).toLocaleString() : new Date().toLocaleString();
+    badge.innerHTML = `<span class="icon">${stateConfig.icon}</span> <span class="label">${stateConfig.label}</span> <span class="time" title="${dateStr}">(${dateStr})</span>`;
+    badge.setAttribute("data-state", status);
+    badge.title = stateConfig.tooltip;
+  } else if (badge) {
+    badge.classList.add("hidden");
+  }
+}
+
 const apiBase = window.location.protocol === "file:"
   ? "http://localhost:3000"
   : window.location.hostname.endsWith("web.app") || window.location.hostname.endsWith("firebaseapp.com")
@@ -108,9 +149,15 @@ function intakePayload() {
       mvpDefinition: data.get("mvpDefinition"),
       knownRisks: lines(data.get("knownRisks") || ""),
       openQuestions: lines(data.get("openQuestions") || ""),
+      budget: data.get("budget"),
+      timeline: data.get("timeline"),
+      compliance: data.get("compliance"),
+      generateLegalDocs: data.get("generateLegalDocs") === "on",
+      brandColors: data.get("brandColors"),
+      typography: data.get("typography"),
       gitUrl: data.get("gitUrl") || undefined,
-      skillsUrl: data.get("skillsUrl") || undefined,
-      knowledgeUrl: data.get("knowledgeUrl") || undefined
+      skillsUrl: lines(data.get("skillsUrl") || ""),
+      knowledgeUrl: lines(data.get("knowledgeUrl") || "")
     }
   };
 }
@@ -164,7 +211,17 @@ function updateArtifactSelectOptions() {
     { value: "Docs/User_Roles.md", label: "User Roles" },
     { value: "Docs/Methodology_Guide.md", label: "Methodology Guide" },
     { value: "Docs/System_Tools.md", label: "System Tools" },
-    { value: "Docs/Success_Criteria.md", label: "Success Criteria" }
+    { value: "Docs/Success_Criteria.md", label: "Success Criteria" },
+    { value: "Docs/Architecture/ARCHITECTURE.md", label: "Architecture Overview" },
+    { value: "Docs/Architecture/DATABASE.md", label: "Database Design" },
+    { value: "Docs/Architecture/API_SPEC.md", label: "API Specification" },
+    { value: "Docs/Architecture/AUTH.md", label: "Auth Specs" },
+    { value: "Docs/Architecture/PAYMENTS.md", label: "Payment Specs" },
+    { value: "Docs/Architecture/SECURITY.md", label: "Security Specs" },
+    { value: "Docs/Architecture/FRONTEND.md", label: "Frontend Specs" },
+    { value: "Docs/Architecture/BACKEND.md", label: "Backend Specs" },
+    { value: "Docs/Architecture/TESTING.md", label: "Testing Strategy" },
+    { value: "Docs/Architecture/DEPLOYMENT.md", label: "Deployment Config" }
   ];
 
   artifactSelect.innerHTML = "";
@@ -318,6 +375,28 @@ async function scan() {
       fileState.textContent = missing === 0 ? "All required files present" : `${missing} missing`;
     }
     setHealth(payload.health.score);
+    if (payload.projectStatus) {
+      updateSubmitButton(payload.projectStatus.status, payload.projectStatus.statusUpdatedAt);
+    }
+    
+    // Update Dynamic Authorization Button State
+    const authBtn = document.querySelector('[data-action="authorizeUrls"]');
+    if (authBtn && payload.scan.authStatus) {
+      if (payload.scan.authStatus === "authorized") {
+        authBtn.innerHTML = "✅ URLs Authorized";
+        authBtn.style.background = "#00ffcc";
+        authBtn.style.color = "#000";
+      } else if (payload.scan.authStatus === "rejected") {
+        authBtn.innerHTML = "🚩 URLs Rejected";
+        authBtn.style.background = "#ff4d4d";
+        authBtn.style.color = "#fff";
+      } else {
+        authBtn.innerHTML = "🛡️ Authorize URLs";
+        authBtn.style.background = "";
+        authBtn.style.color = "";
+      }
+    }
+
     renderList(
       recommendedActions,
       actionCount,
@@ -327,6 +406,7 @@ async function scan() {
     );
     log("Project scan", payload);
     showNotification(`Scan completed: ${missing} missing files`, missing > 0 ? "warning" : "success", 3000);
+    await loadProjectTree();
   } catch (error) {
     log("Scan failed", String(error));
     showNotification("Scan failed: " + String(error), "error", 0);
@@ -364,9 +444,13 @@ async function validate() {
 async function createHandoff() {
   setPanelLoading(document.querySelector(".panel.command-panel"), true);
   try {
-    const payload = await request(`/projects/${activeProjectId}/handoff`, { method: "POST" });
+    const payload = await request(`/projects/${activeProjectId}/handoff`, { 
+      method: "POST",
+      body: JSON.stringify({ editor: selectedEditor })
+    });
     log("Handoff Package Created", payload);
     showNotification("Handoff package created in .shiptec-handoff folder", "success", 3000);
+    updateSubmitButton("handed_over", new Date().toISOString());
   } catch (error) {
     log("Handoff failed", String(error));
     showNotification("Handoff failed: " + String(error), "error", 0);
@@ -667,11 +751,12 @@ if (cancelArtifactEdit) {
 
 // Intake Wizard logic
 let currentStep = 1;
-const totalSteps = 5;
+const totalSteps = 8;
 
 const prevStepBtn = document.getElementById("prevStep");
 const nextStepBtn = document.getElementById("nextStep");
 const submitIntakeBtn = document.getElementById("submitIntake");
+const submitWrapper = document.querySelector(".submit-intake-wrapper");
 const stepIndicator = document.getElementById("stepIndicator");
 
 function updateWizard() {
@@ -683,7 +768,7 @@ function updateWizard() {
   if (stepIndicator) stepIndicator.textContent = `Step ${currentStep} of ${totalSteps}`;
   if (prevStepBtn) prevStepBtn.disabled = currentStep === 1;
   if (nextStepBtn) nextStepBtn.style.display = currentStep === totalSteps ? "none" : "block";
-  if (submitIntakeBtn) submitIntakeBtn.style.display = currentStep === totalSteps ? "block" : "none";
+  if (submitWrapper) submitWrapper.style.display = currentStep === totalSteps ? "flex" : "none";
 }
 
 if (nextStepBtn) {
@@ -707,8 +792,16 @@ if (prevStepBtn) {
 if (form) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    
+    const confirmMsg = currentProjectStatus === 'handed_over' 
+      ? "This project has already been handed over. Are you sure you want to re-initialize it? This may overwrite existing scaffolding files."
+      : "Are you sure you want to initialize this project? This will provision the base architecture and artifacts.";
+    
+    if (!confirm(confirmMsg)) return;
+
     try {
       showLoading("Initializing project...");
+      updateSubmitButton("re_initializing");
       const payload = await request("/projects/init", {
         method: "POST",
         body: JSON.stringify(intakePayload())
@@ -716,12 +809,30 @@ if (form) {
       setActiveProject(payload.project.id);
       log("Project initialized", payload);
       showNotification(`Project ${payload.project.name} initialized successfully`, "success", 3000);
+      
+      // Force the "Project Initialized" success state on the button
+      const btn = document.querySelector("#submitIntake");
+      if (btn) {
+        btn.innerHTML = `✔ Project Initialized`;
+        btn.style.background = "#00ffcc";
+        btn.style.color = "#000";
+      }
+
       await loadProjects();
       await scan();
       await validate();
       await git();
       await getGitHubStatus();
       hideLoading();
+
+      // Revert the button to its state-based label after 3 seconds
+      setTimeout(() => {
+        if (btn) {
+          btn.style.background = "";
+          btn.style.color = "";
+          updateSubmitButton("initialized");
+        }
+      }, 3000);
     } catch (error) {
       log("Initialize failed", String(error));
       showNotification("Project initialization failed: " + String(error), "error", 0);
@@ -757,7 +868,20 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       if (action === "applySpec") await applySpec();
       if (action === "createHandoff") await createHandoff();
       if (action === "dryRun") await dryRun();
-      if (action === "validateDryRun") await validateDryRun();
+      if (action === "authorizeUrls") {
+        setPanelLoading(document.querySelector(".panel.command-panel"), true);
+        try {
+          const payload = await request(`/projects/${activeProjectId}/authorize-urls`, { method: "POST" });
+          log("URL Authorization", payload);
+          showNotification(`Authorized ${payload.authorized.length} URLs. Flagged ${payload.flagged.length}.`, "success", 5000);
+          await scan();
+        } catch (error) {
+          log("URL Authorization failed", String(error));
+          showNotification("Authorization failed: " + String(error), "error", 0);
+        } finally {
+          setPanelLoading(document.querySelector(".panel.command-panel"), false);
+        }
+      }
       if (action === "git") await git();
       if (action === "accept") await accept(false);
       if (action === "commit") await accept(true);
@@ -765,12 +889,376 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       if (action === "editArtifact") await editArtifact();
       if (action === "previewUpdate") await previewUpdate();
       if (action === "githubSetup") await githubSetup();
+      if (action === "exportHandoff") openExportModal();
     } catch (error) {
       log("Action failed", String(error));
       showNotification(`Action failed: ${String(error)}`, "error", 0);
     }
   });
 });
+
+// ─── Folder Tree ───────────────────
+function getFileIcon(name, isDir) {
+  if (isDir) return '📁';
+  const ext = name.split('.').pop()?.toLowerCase();
+  const icons = {
+    'md': '📝', 'ts': '🔷', 'js': '🟨', 'json': '📋',
+    'css': '🎨', 'html': '🌐', 'yml': '⚙️', 'yaml': '⚙️',
+    'txt': '📄', 'log': '📜', 'env': '🔒', 'bak': '💾'
+  };
+  return icons[ext] || '📄';
+}
+
+function formatFileSize(bytes) {
+  if (bytes == null) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function countTreeStats(nodes) {
+  let dirs = 0, files = 0, totalSize = 0;
+  function walk(list) {
+    for (const node of list) {
+      if (node.type === 'directory') {
+        dirs++;
+        if (node.children) walk(node.children);
+      } else {
+        files++;
+        if (node.size) totalSize += node.size;
+      }
+    }
+  }
+  walk(nodes);
+  return { dirs, files, totalSize };
+}
+
+function renderTreeNode(node, depth = 0) {
+  const div = document.createElement('div');
+  div.className = 'tree-node';
+  div.dataset.depth = depth;
+
+  const content = document.createElement('div');
+  content.className = 'tree-node-content';
+  content.style.paddingLeft = (depth * 4) + 'px';
+
+  const isDir = node.type === 'directory';
+  const hasChildren = isDir && node.children && node.children.length > 0;
+
+  // Toggle arrow
+  const toggle = document.createElement('span');
+  toggle.className = 'tree-toggle' + (hasChildren ? ' expanded' : ' empty');
+  toggle.textContent = '▶';
+  content.appendChild(toggle);
+
+  // Icon
+  const icon = document.createElement('span');
+  icon.className = 'tree-node-icon';
+  icon.textContent = getFileIcon(node.name, isDir);
+  content.appendChild(icon);
+
+  // Name
+  const name = document.createElement('span');
+  name.className = 'tree-node-name' + (isDir ? ' directory' : '');
+  name.textContent = node.name;
+  name.title = node.relativePath;
+  content.appendChild(name);
+
+  // Size (files only)
+  if (!isDir && node.size != null) {
+    const size = document.createElement('span');
+    size.className = 'tree-node-size';
+    size.textContent = formatFileSize(node.size);
+    content.appendChild(size);
+  }
+
+  div.appendChild(content);
+
+  // Children container
+  if (isDir) {
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'tree-children expanded';
+
+    if (node.children) {
+      for (const child of node.children) {
+        childrenContainer.appendChild(renderTreeNode(child, depth + 1));
+      }
+    }
+
+    // Set initial max-height for animation
+    div.appendChild(childrenContainer);
+
+    // Toggle click handler
+    content.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isExpanded = childrenContainer.classList.contains('expanded');
+      if (isExpanded) {
+        childrenContainer.classList.remove('expanded');
+        childrenContainer.classList.add('collapsed');
+        toggle.classList.remove('expanded');
+      } else {
+        childrenContainer.classList.remove('collapsed');
+        childrenContainer.classList.add('expanded');
+        toggle.classList.add('expanded');
+      }
+    });
+  } else {
+    // File click: try to load the artifact if it's an .md file
+    content.addEventListener('click', () => {
+      if (node.name.endsWith('.md') && artifactSelect) {
+        const matchOption = Array.from(artifactSelect.options).find(o => o.value === node.relativePath);
+        if (matchOption) {
+          artifactSelect.value = node.relativePath;
+          viewArtifact();
+          showNotification('Loading artifact: ' + node.name, 'info', 2000);
+        }
+      }
+    });
+  }
+
+  return div;
+}
+
+function renderTree(treeData) {
+  const container = document.getElementById('folderTreeContainer');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!treeData || treeData.length === 0) {
+    container.innerHTML = '<div class="tree-placeholder">No files found in project directory.</div>';
+    return;
+  }
+
+  for (const node of treeData) {
+    container.appendChild(renderTreeNode(node));
+  }
+
+  // Update stats
+  const stats = countTreeStats(treeData);
+  const dirCountEl = document.getElementById('treeDirCount');
+  const fileCountEl = document.getElementById('treeFileCount');
+  const totalSizeEl = document.getElementById('treeTotalSize');
+  if (dirCountEl) dirCountEl.textContent = stats.dirs;
+  if (fileCountEl) fileCountEl.textContent = stats.files;
+  if (totalSizeEl) totalSizeEl.textContent = formatFileSize(stats.totalSize);
+}
+
+function showTreeLoading() {
+  const container = document.getElementById('folderTreeContainer');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="tree-loading">
+      <div class="tree-loading-line"></div>
+      <div class="tree-loading-line"></div>
+      <div class="tree-loading-line"></div>
+      <div class="tree-loading-line"></div>
+      <div class="tree-loading-line"></div>
+    </div>
+  `;
+}
+
+async function loadProjectTree() {
+  showTreeLoading();
+  try {
+    const payload = await request(`/projects/${activeProjectId}/tree`);
+    renderTree(payload.tree);
+  } catch (error) {
+    const container = document.getElementById('folderTreeContainer');
+    if (container) {
+      container.innerHTML = '<div class="tree-placeholder">Failed to load project structure.</div>';
+    }
+  }
+}
+
+function collapseAllTree() {
+  const container = document.getElementById('folderTreeContainer');
+  if (!container) return;
+  container.querySelectorAll('.tree-children').forEach(el => {
+    el.classList.remove('expanded');
+    el.classList.add('collapsed');
+  });
+  container.querySelectorAll('.tree-toggle').forEach(el => {
+    el.classList.remove('expanded');
+  });
+}
+
+function expandAllTree() {
+  const container = document.getElementById('folderTreeContainer');
+  if (!container) return;
+  container.querySelectorAll('.tree-children').forEach(el => {
+    el.classList.remove('collapsed');
+    el.classList.add('expanded');
+  });
+  container.querySelectorAll('.tree-toggle:not(.empty)').forEach(el => {
+    el.classList.add('expanded');
+  });
+}
+
+// Tree control buttons
+const refreshTreeBtn = document.getElementById('refreshTree');
+const collapseAllTreeBtn = document.getElementById('collapseAllTree');
+const expandAllTreeBtn = document.getElementById('expandAllTree');
+
+if (refreshTreeBtn) refreshTreeBtn.addEventListener('click', loadProjectTree);
+if (collapseAllTreeBtn) collapseAllTreeBtn.addEventListener('click', collapseAllTree);
+if (expandAllTreeBtn) expandAllTreeBtn.addEventListener('click', expandAllTree);
+
+// ─── Export Handoff Modal ──────────────────────────────────
+
+const exportModalOverlay = document.getElementById('exportModalOverlay');
+const exportModalClose = document.getElementById('exportModalClose');
+const exportCancelBtn = document.getElementById('exportCancelBtn');
+const exportExecuteBtn = document.getElementById('exportExecuteBtn');
+const exportDestSection = document.getElementById('exportDestSection');
+const exportDestPath = document.getElementById('exportDestPath');
+
+function openExportModal() {
+  if (exportModalOverlay) {
+    exportModalOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Pre-select the currently selected editor in the export modal
+    document.querySelectorAll('.export-editor-grid .editor-card').forEach(card => {
+      const isSelected = card.dataset.editor === selectedEditor;
+      card.classList.toggle('selected', isSelected);
+      const radio = card.querySelector('input[type="radio"]');
+      if (radio) radio.checked = isSelected;
+    });
+  }
+}
+
+function closeExportModal() {
+  if (exportModalOverlay) {
+    exportModalOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
+if (exportModalClose) exportModalClose.addEventListener('click', closeExportModal);
+if (exportCancelBtn) exportCancelBtn.addEventListener('click', closeExportModal);
+if (exportModalOverlay) {
+  exportModalOverlay.addEventListener('click', (e) => {
+    if (e.target === exportModalOverlay) closeExportModal();
+  });
+}
+
+// Format card selection
+document.querySelectorAll('.export-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.export-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    const radio = card.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+
+    // Show/hide destination path
+    const format = card.dataset.format;
+    if (exportDestSection) {
+      exportDestSection.style.display = format === 'folder' ? 'block' : 'none';
+    }
+  });
+});
+
+// Editor card selection
+document.querySelectorAll('.export-editor-grid .editor-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.export-editor-grid .editor-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    const radio = card.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+
+    // Sync selection back to main dashboard
+    const editor = card.dataset.editor;
+    if (editor) {
+      selectEditor(editor);
+    }
+  });
+});
+
+// Execute export
+async function executeExport() {
+  const formatRadio = document.querySelector('input[name="exportFormat"]:checked');
+  const editorRadio = document.querySelector('input[name="targetEditor"]:checked');
+  
+  if (!formatRadio || !editorRadio) {
+    showNotification('Please select a format and editor', 'warning', 3000);
+    return;
+  }
+
+  const format = formatRadio.value;
+  const editor = editorRadio.value;
+  const destPath = exportDestPath ? exportDestPath.value.trim() : '';
+
+  if (format === 'folder' && !destPath) {
+    showNotification('Please enter a destination path for folder export', 'warning', 3000);
+    return;
+  }
+
+  // Set loading state
+  if (exportExecuteBtn) {
+    exportExecuteBtn.disabled = true;
+    exportExecuteBtn.querySelector('.export-btn-text').textContent = 'Exporting...';
+    exportExecuteBtn.classList.add('loading');
+  }
+
+  try {
+    const body = { format, editor };
+    if (format === 'folder' && destPath) body.destinationPath = destPath;
+
+    if (format === 'zip') {
+      // Fetch as blob for download
+      const response = await fetch(`${apiBase}/projects/${activeProjectId}/handoff/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText);
+      }
+
+      const blob = await response.blob();
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] 
+        || `handoff-${editor}.zip`;
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      log('Export completed (ZIP)', { format, editor, filename });
+      showNotification(`📦 Handoff ZIP downloaded: ${filename}`, 'success', 5000);
+    } else {
+      // Folder export via JSON
+      const payload = await request(`/projects/${activeProjectId}/handoff/export`, {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+
+      log('Export completed (Folder)', payload);
+      showNotification(`📂 Handoff exported to: ${payload.destinationPath}`, 'success', 5000);
+    }
+
+    updateSubmitButton('handed_over', new Date().toISOString());
+    closeExportModal();
+  } catch (error) {
+    log('Export failed', String(error));
+    showNotification('Export failed: ' + String(error), 'error', 0);
+  } finally {
+    if (exportExecuteBtn) {
+      exportExecuteBtn.disabled = false;
+      exportExecuteBtn.querySelector('.export-btn-text').textContent = 'Export Package';
+      exportExecuteBtn.classList.remove('loading');
+    }
+  }
+}
+
+if (exportExecuteBtn) exportExecuteBtn.addEventListener('click', executeExport);
 
 checkHealth().then(async () => {
   await loadProjects();

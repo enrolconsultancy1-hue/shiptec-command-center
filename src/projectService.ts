@@ -3,7 +3,7 @@ import { Octokit } from "@octokit/rest";
 import { z } from "zod";
 import { artifactExists, readArtifactText, readArtifactTextIfExists, writeArtifact, writeArtifactIfMissing } from "./artifactStore.js";
 import { badRequest, notFound } from "./errors.js";
-import { ProjectRecord, ProjectScan, SprintAcceptanceInput, SprintAcceptanceResult, SprintArtifacts, SprintRecord } from "./types.js";
+import { FolderTreeNode, ProjectLifecycleStatus, ProjectRecord, ProjectScan, SprintAcceptanceInput, SprintAcceptanceResult, SprintArtifacts, SprintRecord } from "./types.js";
 import { saveProject, findProject, readProjects } from "./projectStore.js";
 import { commitSprint, pushSprint, gitStatus, setupRemoteRepository } from "./gitService.js";
 import { calculateHealth } from "./health.js";
@@ -27,7 +27,19 @@ import {
   systemToolsTemplate,
   technicalBlueprintTemplate,
   testReportTemplate,
-  userRolesTemplate
+  userRolesTemplate,
+  architectureOverviewTemplate,
+  databaseDesignTemplate,
+  apiSpecTemplate,
+  authTemplate,
+  paymentsTemplate,
+  securityTemplate,
+  frontendTemplate,
+  backendTemplate,
+  testingTemplate,
+  deploymentTemplate,
+  userAgreementTemplate,
+  privacyPolicyTemplate
 } from "./templates.js";
 import { validateIntake } from "./validation.js";
 
@@ -44,9 +56,15 @@ export const intakeSchema = z.object({
   mvpDefinition: z.string().min(1),
   knownRisks: z.array(z.string()).default([]),
   openQuestions: z.array(z.string()).default([]),
+  budget: z.string().optional().default("Not specified"),
+  timeline: z.string().optional().default("Not specified"),
+  compliance: z.string().optional().default("None specified"),
+  generateLegalDocs: z.boolean().default(false),
+  brandColors: z.string().optional().default("Not specified"),
+  typography: z.string().optional().default("Not specified"),
   gitUrl: z.string().url().optional().or(z.literal("")),
-  skillsUrl: z.string().url().optional().or(z.literal("")),
-  knowledgeUrl: z.string().url().optional().or(z.literal("")),
+  skillsUrl: z.array(z.string().url()).default([]),
+  knowledgeUrl: z.array(z.string().url()).default([]),
 });
 
 const initSchema = z.object({
@@ -142,6 +160,11 @@ export async function generateBuilderSpecification(project: ProjectRecord): Prom
 ## 🆔 METADATA
 - ID: ${generationId} | Date: ${new Date().toISOString()}
 - Project: ${project.id} | Branch: ${branch} | Hash: ${commitHash}
+- Budget: ${project.intake.budget} | Timeline: ${project.intake.timeline}
+- Compliance: ${project.intake.compliance}
+- Brand: ${project.intake.brandColors} | Typo: ${project.intake.typography}
+
+---
 
 ---
 
@@ -200,7 +223,9 @@ export async function initializeProject(input: unknown): Promise<ProjectRecord> 
     name: parsed.intake.projectName,
     rootPath,
     intake: parsed.intake,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    status: "initialized",
+    statusUpdatedAt: new Date().toISOString()
   };
 
   await provisionProjectFiles(project);
@@ -211,6 +236,24 @@ export async function initializeProject(input: unknown): Promise<ProjectRecord> 
   }
 
   return project;
+}
+
+/**
+ * Update and persist the lifecycle status of a project.
+ * My recommendation: always stamp `statusUpdatedAt` so the UI can show
+ * a human-readable "since" time next to the button.
+ */
+export async function updateProjectStatus(
+  project: ProjectRecord,
+  status: ProjectLifecycleStatus
+): Promise<ProjectRecord> {
+  const updated: ProjectRecord = {
+    ...project,
+    status,
+    statusUpdatedAt: new Date().toISOString()
+  };
+  await saveProject(updated);
+  return updated;
 }
 
 export async function createGitHubRepository(project: ProjectRecord, token: string): Promise<{ url: string; configured: boolean }> {
@@ -264,8 +307,23 @@ export async function provisionProjectFiles(project: ProjectRecord): Promise<voi
     "Docs/User_Roles.md": userRolesTemplate(intake),
     "Docs/Methodology_Guide.md": methodologyGuideTemplate(),
     "Docs/System_Tools.md": systemToolsTemplate(intake),
-    "Docs/Success_Criteria.md": successCriteriaTemplate(intake)
+    "Docs/Success_Criteria.md": successCriteriaTemplate(intake),
+    "Docs/Architecture/ARCHITECTURE.md": architectureOverviewTemplate(intake),
+    "Docs/Architecture/DATABASE.md": databaseDesignTemplate(intake),
+    "Docs/Architecture/API_SPEC.md": apiSpecTemplate(intake),
+    "Docs/Architecture/AUTH.md": authTemplate(),
+    "Docs/Architecture/PAYMENTS.md": paymentsTemplate(),
+    "Docs/Architecture/SECURITY.md": securityTemplate(),
+    "Docs/Architecture/FRONTEND.md": frontendTemplate(),
+    "Docs/Architecture/BACKEND.md": backendTemplate(),
+    "Docs/Architecture/TESTING.md": testingTemplate(),
+    "Docs/Architecture/DEPLOYMENT.md": deploymentTemplate()
   };
+
+  if (intake.generateLegalDocs) {
+    files["Docs/Legal/User_Agreement.md"] = userAgreementTemplate(intake);
+    files["Docs/Legal/Privacy_Policy.md"] = privacyPolicyTemplate(intake);
+  }
 
   for (const [relativePath, content] of Object.entries(files)) {
     await writeArtifactIfMissing(project, relativePath, content);
@@ -277,12 +335,25 @@ export async function scanProject(project: ProjectRecord): Promise<ProjectScan> 
     path: relativePath,
     exists: await artifactExists(project, relativePath)
   })));
+  
+  // Check for URL Authorization status
+  let authStatus: "pending" | "authorized" | "rejected" = "pending";
+  try {
+    const authData = await readArtifactTextIfExists(project, "Planning/Governance/Authorized_URLs.json");
+    if (authData) {
+      const parsed = JSON.parse(authData);
+      authStatus = parsed.flagged && parsed.flagged.length > 0 ? "rejected" : "authorized";
+    }
+  } catch {
+    authStatus = "pending";
+  }
 
   return {
     projectId: project.id,
     rootPath: project.rootPath,
     files,
-    missingFiles: files.filter((file) => !file.exists).map((file) => file.path)
+    missingFiles: files.filter((file) => !file.exists).map((file) => file.path),
+    authStatus
   };
 }
 
@@ -347,7 +418,17 @@ function getAllowedArtifactPaths(): string[] {
     "Sprints/Sprint_001/Builder_Dry_Run.md",
     "Sprints/Sprint_001/Implementation_Log.md",
     "Sprints/Sprint_001/Test_Report.md",
-    "Planning/Builder_Specification.md"
+    "Planning/Builder_Specification.md",
+    "Docs/Architecture/ARCHITECTURE.md",
+    "Docs/Architecture/DATABASE.md",
+    "Docs/Architecture/API_SPEC.md",
+    "Docs/Architecture/AUTH.md",
+    "Docs/Architecture/PAYMENTS.md",
+    "Docs/Architecture/SECURITY.md",
+    "Docs/Architecture/FRONTEND.md",
+    "Docs/Architecture/BACKEND.md",
+    "Docs/Architecture/TESTING.md",
+    "Docs/Architecture/DEPLOYMENT.md"
   ];
 }
 
@@ -621,4 +702,52 @@ ${report.findings.map((finding) => `- [${finding.status}] ${finding.field}: ${fi
 
 function slugify(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "shiptec-project";
+}
+
+export async function getProjectTree(project: ProjectRecord, maxDepth: number = 5): Promise<FolderTreeNode[]> {
+  if (useFirestoreBackend()) {
+    return [{ name: project.id, type: "directory", relativePath: ".", children: [{ name: "(Firestore virtual storage)", type: "file", relativePath: "virtual" }] }];
+  }
+
+  const fs = await import("node:fs/promises");
+  const IGNORED = new Set(["node_modules", ".git", ".shiptec", ".shiptec-handoff"]);
+
+  async function walk(dirPath: string, relativeTo: string, depth: number): Promise<FolderTreeNode[]> {
+    if (depth > maxDepth) return [];
+    let entries;
+    try {
+      entries = await fs.readdir(dirPath, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const nodes: FolderTreeNode[] = [];
+    const sorted = entries.sort((a, b) => {
+      if (a.isDirectory() && !b.isDirectory()) return -1;
+      if (!a.isDirectory() && b.isDirectory()) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    for (const entry of sorted) {
+      if (IGNORED.has(entry.name) || entry.name.startsWith(".")) continue;
+      const fullPath = path.join(dirPath, entry.name);
+      const relPath = path.relative(relativeTo, fullPath).replace(/\\/g, "/");
+
+      if (entry.isDirectory()) {
+        const children = await walk(fullPath, relativeTo, depth + 1);
+        nodes.push({ name: entry.name, type: "directory", relativePath: relPath, children });
+      } else {
+        let size: number | undefined;
+        try {
+          const stats = await fs.stat(fullPath);
+          size = stats.size;
+        } catch { /* ignore */ }
+        nodes.push({ name: entry.name, type: "file", relativePath: relPath, size });
+      }
+    }
+
+    return nodes;
+  }
+
+  return walk(project.rootPath, project.rootPath, 0);
 }

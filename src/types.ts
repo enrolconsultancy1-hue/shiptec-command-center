@@ -1,5 +1,7 @@
 export type ValidationStatus = "pass" | "warning" | "fail";
 
+export type ProjectLifecycleStatus = "fresh" | "initialized" | "in_progress" | "handed_over";
+
 export interface IntakeInput {
   projectName: string;
   productSummary: string;
@@ -24,6 +26,10 @@ export interface ProjectRecord {
   rootPath: string;
   intake: IntakeInput;
   createdAt: string;
+  /** Lifecycle state of the project. Defaults to 'initialized' for legacy records. */
+  status?: ProjectLifecycleStatus;
+  /** ISO timestamp of the last status change. */
+  statusUpdatedAt?: string;
 }
 
 export interface FileCheck {
@@ -36,6 +42,7 @@ export interface ProjectScan {
   rootPath: string;
   files: FileCheck[];
   missingFiles: string[];
+  authStatus: "pending" | "authorized" | "rejected";
 }
 
 export interface ValidationFinding {
@@ -106,4 +113,23 @@ export interface GitStatusSummary {
 export interface GitHubConfigStatus {
   configured: boolean;
   reason?: string;
+}
+
+export interface FolderTreeNode {
+  name: string;
+  type: "file" | "directory";
+  relativePath: string;
+  size?: number;
+  children?: FolderTreeNode[];
+}
+
+export type ExportFormat = "zip" | "folder";
+
+export type TargetEditor = "antigravity" | "opencode" | "codex" | "claudecode" | "cursor";
+
+export interface HandoffExportResult {
+  format: ExportFormat;
+  editor: TargetEditor;
+  filesIncluded: string[];
+  destinationPath?: string;
 }

@@ -3,10 +3,12 @@ import { z } from "zod";
 import { badRequest } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
-import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateValidationReport, validateDryRun } from "./projectService.js";
+import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, getProjectTree, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateProjectStatus, updateValidationReport, validateDryRun } from "./projectService.js";
+import { authorizeUrls } from "./skillSpectorService.js";
 import { applyBuilderSpecification } from "./builderService.js";
-import { createHandoffPackage } from "./handoffService.js";
+import { createHandoffPackage, exportHandoffPackage } from "./handoffService.js";
 import { validateIntake } from "./validation.js";
+import type { ExportFormat, TargetEditor } from "./types.js";
 
 export const router = Router();
 
@@ -45,7 +47,25 @@ router.get("/projects/:id/scan", async (request, response, next) => {
     // Auto-update current state whenever a scan is performed
     await updateCurrentState(project);
     
-    response.json({ scan, health });
+    response.json({
+      scan,
+      health,
+      projectStatus: {
+        status: project.status ?? "initialized",
+        statusUpdatedAt: project.statusUpdatedAt ?? project.createdAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/projects/:id/tree", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const depth = Math.min(Number(request.query.depth) || 5, 10);
+    const tree = await getProjectTree(project, depth);
+    response.json({ projectId: project.id, tree });
   } catch (error) {
     next(error);
   }
@@ -177,10 +197,23 @@ router.post("/projects/:id/sprints/:sprintId/validate-dry-run", async (request, 
   }
 });
 
+router.post("/projects/:id/authorize-urls", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const result = await authorizeUrls(project);
+    response.json({ ...result, message: "URL Authorization scan complete. Library updated." });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/projects/:id/sprints/:sprintId/accept", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
     const acceptance = await acceptSprint(project, request.params.sprintId, request.body);
+    // My recommendation: stamp in_progress on every accepted sprint so the
+    // button always reflects that real sprint work has been acknowledged.
+    await updateProjectStatus(project, "in_progress");
     response.json({ acceptance });
   } catch (error) {
     next(error);
@@ -214,7 +247,44 @@ router.post("/projects/:id/handoff", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
     const result = await createHandoffPackage(project);
+    // My recommendation: treat handoff creation as a terminal lifecycle event
+    // and persist it immediately so any subsequent scan reflects 'handed_over'.
+    await updateProjectStatus(project, "handed_over");
     response.json({ ...result, message: "Handoff package created in .shiptec-handoff folder." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const exportBodySchema = z.object({
+  format: z.enum(["zip", "folder"]),
+  editor: z.enum(["antigravity", "opencode", "codex", "claudecode", "cursor"]),
+  destinationPath: z.string().optional()
+});
+
+router.post("/projects/:id/handoff/export", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const body = exportBodySchema.parse(request.body);
+
+    const { result, zipBuffer } = await exportHandoffPackage(
+      project,
+      body.format as ExportFormat,
+      body.editor as TargetEditor,
+      body.destinationPath
+    );
+
+    await updateProjectStatus(project, "handed_over");
+
+    if (body.format === "zip" && zipBuffer) {
+      const filename = `${project.name.replace(/[^a-zA-Z0-9_-]/g, "_")}-handoff-${body.editor}.zip`;
+      response.setHeader("Content-Type", "application/zip");
+      response.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      response.setHeader("Content-Length", zipBuffer.length);
+      response.end(zipBuffer);
+    } else {
+      response.json({ ...result, message: `Handoff package exported as folder to ${result.destinationPath}` });
+    }
   } catch (error) {
     next(error);
   }

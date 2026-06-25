@@ -4,14 +4,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Shiptec Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <div class="aurora-blur">
+      <div class="aurora-blob blob-1"></div>
+      <div class="aurora-blob blob-2"></div>
+      <div class="aurora-blob blob-3"></div>
+    </div>
     <main class="shell">
       <section class="topbar">
         <div>
           <p class="eyebrow">Shiptec</p>
           <h1>Command Center</h1>
+        </div>
+        <div class="topbar-marquee" id="topbarMarquee">
+          <div class="marquee-track">
+            <span class="marquee-text">THE ELITE EXPERIENCE OF DEVELOPERS from <span class="tectagrand-brand">tectagrand</span><span class="sup-reg">&reg;</span></span>
+            <span class="marquee-text">THE ELITE EXPERIENCE OF DEVELOPERS from <span class="tectagrand-brand">tectagrand</span><span class="sup-reg">&reg;</span></span>
+          </div>
         </div>
         <div class="status-pill" id="serviceStatus">Checking</div>
       </section>
@@ -27,7 +41,7 @@
         <form class="panel intake-panel" id="intakeForm">
           <div class="panel-head">
             <h2>Architect Intake</h2>
-            <div id="stepIndicator">Step 1 of 5</div>
+            <div id="stepIndicator">Step 1 of 8</div>
           </div>
 
           <div class="intake-step active" data-step="1">
@@ -55,8 +69,8 @@
             <label>Technical constraints<textarea name="technicalConstraints">Node.js\nTypeScript\nExpress\nMarkdown artifacts\nNo silent overwrites</textarea></label>
           </div>
           <div class="grid-two">
-            <label>Verified Skills URL (e.g. Claude Code UI/UX)<input name="skillsUrl" placeholder="https://github.com/..."></label>
-            <label>Knowledge Projects URL (Reference Projects)<input name="knowledgeUrl" placeholder="https://github.com/..."></label>
+            <label>Verified Skills URL (e.g. Claude Code UI/UX)<textarea name="skillsUrl" placeholder="https://github.com/...\nhttps://github.com/..."></textarea></label>
+            <label>Knowledge Projects URL (Reference Projects)<textarea name="knowledgeUrl" placeholder="https://github.com/...\nhttps://github.com/..."></textarea></label>
           </div>
           </div>
 
@@ -65,10 +79,31 @@
             <label>Open questions<textarea name="openQuestions"></textarea></label>
           </div>
 
+          <div class="intake-step" data-step="6">
+            <label>Project Budget (e.g. $15,000)<input name="budget" placeholder="Enter budget limit"></label>
+            <label>Target Timeline & Milestones<textarea name="timeline" placeholder="e.g. MVP in 4 weeks, Beta in 8 weeks"></textarea></label>
+          </div>
+
+          <div class="intake-step" data-step="7">
+            <label>Compliance Standards (e.g. GDPR, HIPAA)<textarea name="compliance" placeholder="List any industry standards needed"></textarea></label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="generateLegalDocs" checked>
+              Auto-generate User Agreement & Privacy Policy
+            </label>
+          </div>
+
+          <div class="intake-step" data-step="8">
+            <label>Brand Colors & Visual Guidelines (HEX / Theme)<input name="brandColors" placeholder="e.g. #0070f3 (Primary), Dark Theme"></label>
+            <label>Typography & Interface Rules<textarea name="typography" placeholder="e.g. Inter Font, clean minimal cards, rounded buttons"></textarea></label>
+          </div>
+
           <div class="wizard-actions">
             <button type="button" id="prevStep" disabled>Back</button>
             <button type="button" id="nextStep">Next</button>
-            <button type="submit" id="submitIntake" style="display: none;">Initialize Project</button>
+            <div class="submit-intake-wrapper" style="display: none;">
+              <div id="projectStatusBadge" class="project-status-badge hidden"></div>
+              <button type="submit" id="submitIntake" data-state="fresh">Initialize Project</button>
+            </div>
           </div>
         </form>
 
@@ -112,12 +147,111 @@
             <button type="button" data-action="generateSpecification">Generate Spec</button>
             <button type="button" data-action="applySpec">Apply Spec</button>
             <button type="button" data-action="createHandoff">Create Handoff</button>
+            <button type="button" data-action="exportHandoff" class="btn-export">📦 Export Handoff</button>
             <button type="button" data-action="dryRun">Dry Run</button>
-            <button type="button" data-action="validateDryRun">Validate Dry Run</button>
+            <button type="button" data-action="authorizeUrls">🛡️ Authorize URLs</button>
             <button type="button" data-action="git">Git Status</button>
             <button type="button" data-action="accept">Accept</button>
             <button type="button" data-action="commit">Commit</button>
             <button type="button" data-action="githubSetup">GitHub Setup</button>
+          </div>
+
+          <!-- Export Handoff Modal -->
+          <div class="export-modal-overlay" id="exportModalOverlay">
+            <div class="export-modal">
+              <div class="export-modal-header">
+                <h2>📦 Export Handoff Package</h2>
+                <button class="export-modal-close" id="exportModalClose">&times;</button>
+              </div>
+
+              <div class="export-modal-body">
+                <div class="export-section">
+                  <h3 class="export-section-title">Export Format</h3>
+                  <div class="export-format-grid">
+                    <label class="export-card selected" data-format="zip">
+                      <input type="radio" name="exportFormat" value="zip" checked hidden>
+                      <div class="export-card-icon">📦</div>
+                      <div class="export-card-title">ZIP Archive</div>
+                      <div class="export-card-desc">Download as a compressed .zip file</div>
+                    </label>
+                    <label class="export-card" data-format="folder">
+                      <input type="radio" name="exportFormat" value="folder" hidden>
+                      <div class="export-card-icon">📂</div>
+                      <div class="export-card-title">Folder Export</div>
+                      <div class="export-card-desc">Copy files to a local directory</div>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="export-section export-dest-section" id="exportDestSection" style="display:none;">
+                  <h3 class="export-section-title">Destination Path</h3>
+                  <input type="text" class="export-dest-input" id="exportDestPath" placeholder="C:\path\to\destination\folder">
+                </div>
+
+                <div class="export-section">
+                  <h3 class="export-section-title">Target Editor</h3>
+                  <div class="export-editor-grid">
+                    <label class="editor-card selected" data-editor="antigravity">
+                      <input type="radio" name="targetEditor" value="antigravity" checked hidden>
+                      <img src="icons/antigravity.png" alt="Antigravity" class="editor-card-icon">
+                      <div class="editor-card-name">Antigravity</div>
+                      <div class="editor-card-tag">Google DeepMind</div>
+                    </label>
+                    <label class="editor-card" data-editor="claudecode">
+                      <input type="radio" name="targetEditor" value="claudecode" hidden>
+                      <img src="icons/Cladecode.png" alt="Claude Code" class="editor-card-icon">
+                      <div class="editor-card-name">Claude Code</div>
+                      <div class="editor-card-tag">Anthropic</div>
+                    </label>
+                    <label class="editor-card" data-editor="cursor">
+                      <input type="radio" name="targetEditor" value="cursor" hidden>
+                      <img src="icons/Cursor.png" alt="Cursor" class="editor-card-icon">
+                      <div class="editor-card-name">Cursor</div>
+                      <div class="editor-card-tag">Anysphere</div>
+                    </label>
+                    <label class="editor-card" data-editor="opencode">
+                      <input type="radio" name="targetEditor" value="opencode" hidden>
+                      <img src="icons/Opencode.png" alt="Open Code" class="editor-card-icon">
+                      <div class="editor-card-name">Open Code</div>
+                      <div class="editor-card-tag">Open Source</div>
+                    </label>
+                    <label class="editor-card" data-editor="codex">
+                      <input type="radio" name="targetEditor" value="codex" hidden>
+                      <img src="icons/Codex.png" alt="Codex" class="editor-card-icon">
+                      <div class="editor-card-name">Codex</div>
+                      <div class="editor-card-tag">OpenAI</div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="export-modal-footer">
+                <button class="export-cancel-btn" id="exportCancelBtn">Cancel</button>
+                <button class="export-execute-btn" id="exportExecuteBtn">
+                  <span class="export-btn-icon">⚡</span>
+                  <span class="export-btn-text">Export Package</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="folder-tree-panel">
+            <div class="folder-tree-head">
+              <h3><span class="tree-icon">📂</span> Project Structure</h3>
+              <div class="folder-tree-controls">
+                <button type="button" id="refreshTree" class="tree-btn" title="Refresh">↻</button>
+                <button type="button" id="collapseAllTree" class="tree-btn" title="Collapse All">⊟</button>
+                <button type="button" id="expandAllTree" class="tree-btn" title="Expand All">⊞</button>
+              </div>
+            </div>
+            <div class="folder-tree-stats" id="treeStats">
+              <span class="stat-item"><span class="stat-icon">📁</span> <span id="treeDirCount">--</span> dirs</span>
+              <span class="stat-item"><span class="stat-icon">📄</span> <span id="treeFileCount">--</span> files</span>
+              <span class="stat-item"><span class="stat-icon">💾</span> <span id="treeTotalSize">--</span></span>
+            </div>
+            <div class="folder-tree-container" id="folderTreeContainer">
+              <div class="tree-placeholder">Click <strong>Scan</strong> or wait for project load to view structure.</div>
+            </div>
           </div>
 
           <div class="insight-panel">
@@ -164,6 +298,32 @@
                 <dd id="acceptanceState">--</dd>
               </div>
             </dl>
+          </div>
+
+          <div class="target-editor-panel">
+            <h3>Target Editor</h3>
+            <div class="editor-grid">
+              <button type="button" class="editor-card active" data-editor="antigravity" onclick="selectEditor('antigravity')">
+                <img src="icons/antigravity.png" alt="Antigravity">
+                <span>Antigravity</span>
+              </button>
+              <button type="button" class="editor-card" data-editor="claudecode" onclick="selectEditor('claudecode')">
+                <img src="icons/Cladecode.png" alt="Claude Code">
+                <span>Claude Code</span>
+              </button>
+              <button type="button" class="editor-card" data-editor="cursor" onclick="selectEditor('cursor')">
+                <img src="icons/Cursor.png" alt="Cursor">
+                <span>Cursor</span>
+              </button>
+              <button type="button" class="editor-card" data-editor="opencode" onclick="selectEditor('opencode')">
+                <img src="icons/Opencode.png" alt="Open Code">
+                <span>Open Code</span>
+              </button>
+              <button type="button" class="editor-card" data-editor="codex" onclick="selectEditor('codex')">
+                <img src="icons/Codex.png" alt="Codex">
+                <span>Codex</span>
+              </button>
+            </div>
           </div>
 
           <div class="artifact-panel">
