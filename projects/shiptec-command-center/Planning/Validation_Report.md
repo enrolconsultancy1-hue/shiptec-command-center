@@ -1,10 +1,11 @@
 # Validation Report
 
 ## Status
-pass
+warning
 
 ## Generated At
-2026-06-22T11:23:32.985Z
+2026-06-26T09:54:00.885Z
 
 ## Findings
-- [pass] intake: Intake is specific enough to create the first Architect Pack.
+- [warning] openQuestions: Open questions exist. Mark them non-blocking before Builder execution.
+- [warning] urlAuthorization: URL Authorization scan is pending. Run URL scan to verify safety for 2 configured URL(s).
