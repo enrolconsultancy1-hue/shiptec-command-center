@@ -10,7 +10,8 @@ function statusFromFindings(findings: ValidationFinding[]): ValidationStatus {
   return "pass";
 }
 
-function missing(value: string | string[]): boolean {
+function missing(value: string | string[] | undefined | null): boolean {
+  if (!value) return true;
   return Array.isArray(value) ? value.length === 0 : value.trim().length === 0;
 }
 
@@ -39,11 +40,11 @@ export function validateIntake(intake: IntakeInput): ValidationReport {
     findings.push({ status: "fail", field: "successCriteria", message: "Specific success criteria are required before Builder execution." });
   }
 
-  if (intake.openQuestions.length > 0) {
+  if (intake.openQuestions?.length > 0) {
     findings.push({ status: "warning", field: "openQuestions", message: "Open questions exist. Mark them non-blocking before Builder execution." });
   }
 
-  if (intake.toolsAndIntegrations.some((tool) => /tbd|unknown|maybe/i.test(tool))) {
+  if (intake.toolsAndIntegrations?.some((tool) => /tbd|unknown|maybe/i.test(tool))) {
     findings.push({ status: "warning", field: "toolsAndIntegrations", message: "One or more integrations appear undefined." });
   }
 

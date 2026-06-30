@@ -168,8 +168,8 @@ ${list(intake.toolsAndIntegrations)}
 ${list(intake.technicalConstraints)}
 
 ## Skills & Knowledge Sources
-- **Verified Skills:** ${intake.skillsUrl.length ? intake.skillsUrl.join(", ") : "None provided"}
-- **Reference Projects (Knowledge):** ${intake.knowledgeUrl.length ? intake.knowledgeUrl.join(", ") : "None provided"}
+- **Verified Skills:** ${(intake.skillsUrl || []).length ? (intake.skillsUrl || []).join(", ") : "None provided"}
+- **Reference Projects (Knowledge):** ${(intake.knowledgeUrl || []).length ? (intake.knowledgeUrl || []).join(", ") : "None provided"}
 
 ## Risks
 ${list(intake.knownRisks)}
@@ -197,8 +197,8 @@ export function technicalBlueprintTemplate(intake: IntakeInput): string {
 - Git service owns local Git and GitHub readiness checks.
 
 ## Knowledge Base & Skills Reference
-- **Implementation Skills:** ${intake.skillsUrl.length ? intake.skillsUrl.join(", ") : "Use standard industry patterns"}
-- **Customization Knowledge:** ${intake.knowledgeUrl.length ? intake.knowledgeUrl.join(", ") : "Based on provided product requirements"}
+- **Implementation Skills:** ${(intake.skillsUrl || []).length ? (intake.skillsUrl || []).join(", ") : "Use standard industry patterns"}
+- **Customization Knowledge:** ${(intake.knowledgeUrl || []).length ? (intake.knowledgeUrl || []).join(", ") : "Based on provided product requirements"}
 
 ## Project Constraints
 ${list(intake.technicalConstraints)}

@@ -3,10 +3,11 @@ import { z } from "zod";
 import { badRequest } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
-import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, getProjectTree, initializeProject, listProjects, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateProjectStatus, updateValidationReport, validateDryRun } from "./projectService.js";
+import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, getProjectTree, initializeProject, listProjects, listSprints, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateProjectStatus, updateValidationReport, validateDryRun, validateProject } from "./projectService.js";
 import { authorizeUrls } from "./skillSpectorService.js";
 import { applyBuilderSpecification } from "./builderService.js";
 import { createHandoffPackage, exportHandoffPackage } from "./handoffService.js";
+import { refineArtifact } from "./refinementService.js";
 import { validateIntake } from "./validation.js";
 import type { ExportFormat, TargetEditor } from "./types.js";
 
@@ -63,8 +64,7 @@ router.get("/projects/:id/scan", async (request, response, next) => {
 router.get("/projects/:id/tree", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
-    const depth = Math.min(Number(request.query.depth) || 5, 10);
-    const tree = await getProjectTree(project, depth);
+    const tree = await getProjectTree(project);
     response.json({ projectId: project.id, tree });
   } catch (error) {
     next(error);
@@ -126,15 +126,17 @@ router.post("/projects/:id/artifacts/update", async (request, response, next) =>
 });
 
 
+import { generateProjectGraph } from "./services/graphService.js";
 
-router.post("/projects/:id/intake", async (request, response, next) => {
+router.get("/projects/:id/graph", async (request, response, next) => {
   try {
-    const report = validateIntake(request.body);
-    response.json({ report });
+    const { nodes, edges, stats } = await generateProjectGraph(request.params.id);
+    response.json({ graph: { nodes, edges }, stats });
   } catch (error) {
     next(error);
   }
 });
+
 
 router.post("/projects/:id/architect-pack", async (request, response, next) => {
   try {
@@ -148,8 +150,8 @@ router.post("/projects/:id/architect-pack", async (request, response, next) => {
 router.post("/projects/:id/validate", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
-    const reportMarkdown = await updateValidationReport(project);
-    const report = validateIntake(project.intake);
+    const report = await validateProject(project);
+    const reportMarkdown = await updateValidationReport(project, report);
     response.json({ report, reportMarkdown });
   } catch (error) {
     next(error);
@@ -162,6 +164,16 @@ router.post("/projects/:id/sprints", async (request, response, next) => {
     const body = sprintBodySchema.parse(request.body ?? {});
     const sprint = await createSprint(project, body.sprintNumber);
     response.status(201).json({ sprint });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/projects/:id/sprints", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const sprints = await listSprints(project);
+    response.json({ sprints });
   } catch (error) {
     next(error);
   }
@@ -353,11 +365,21 @@ router.get("/projects/:id/github/status", async (request, response, next) => {
   }
 });
 
-router.post("/projects/:id/git/commit", async (request, response, next) => {
+router.post("/projects/:id/artifacts/refine", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
-    const status = await ensureGitRepository(project.rootPath);
-    response.json({ status, message: "Repository is initialized. Commit creation requires an explicit sprint approval step." });
+    const artifactPath = String(request.body.path ?? "");
+    const vibe = String(request.body.vibe ?? "");
+    
+    if (!artifactPath || !vibe) {
+      throw badRequest("Artifact path and Vibe prompt are required.");
+    }
+    
+    await refineArtifact(project, artifactPath, vibe);
+    // Auto-trigger re-compile
+    await generateBuilderSpecification(project);
+    
+    response.json({ message: "Refinement applied and specification re-compiled." });
   } catch (error) {
     next(error);
   }

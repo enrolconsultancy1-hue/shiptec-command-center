@@ -8,8 +8,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-  </head>
-  <body>
+    <!-- Graph Visualization (vis-network — same library graphify uses) -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
+
+    <!-- 3D Graph Visualization libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three-spritetext@1.8.2/dist/three-spritetext.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.0/dist/3d-force-graph.min.js"></script>
+</head>
+<body>
+
     <div class="aurora-blur">
       <div class="aurora-blob blob-1"></div>
       <div class="aurora-blob blob-2"></div>
@@ -114,8 +122,11 @@
           </div>
 
           <div class="grid-two" style="margin-bottom: 12px;">
-            <label class="project-picker">
-              Known projects
+            <label class="project-picker" style="position: relative;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span>Known projects</span>
+                <button type="button" id="newProjectBtn" style="background: var(--primary-glow); border: 1px solid var(--primary-color); color: var(--primary-color); padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold;">+ New</button>
+              </div>
               <select id="projectSelect">
                 <option value="shiptec-command-center">shiptec-command-center</option>
               </select>
@@ -124,9 +135,6 @@
             <label class="sprint-picker">
               Active Sprint
               <select id="sprintSelect">
-                <option value="Sprint_001">Sprint 001</option>
-                <option value="Sprint_002">Sprint 002</option>
-                <option value="Sprint_003">Sprint 003</option>
               </select>
             </label>
           </div>
@@ -237,8 +245,11 @@
 
           <div class="folder-tree-panel">
             <div class="folder-tree-head">
-              <h3><span class="tree-icon">📂</span> Project Structure</h3>
-              <div class="folder-tree-controls">
+              <div class="tree-tabs">
+                <button type="button" id="treeViewTab" class="tree-tab-btn active">📂 Tree</button>
+                <button type="button" id="graphViewTab" class="tree-tab-btn">📊 Graph</button>
+              </div>
+              <div class="folder-tree-controls" id="treeControls">
                 <button type="button" id="refreshTree" class="tree-btn" title="Refresh">↻</button>
                 <button type="button" id="collapseAllTree" class="tree-btn" title="Collapse All">⊟</button>
                 <button type="button" id="expandAllTree" class="tree-btn" title="Expand All">⊞</button>
@@ -251,6 +262,33 @@
             </div>
             <div class="folder-tree-container" id="folderTreeContainer">
               <div class="tree-placeholder">Click <strong>Scan</strong> or wait for project load to view structure.</div>
+            </div>
+            <div class="graph-wrapper" id="graphWrapper">
+              <div class="graph-controls" id="graphControls">
+                <div class="graph-stats" id="graphStats">
+                  <span class="graph-stat"><span class="graph-stat-icon">⬡</span> <span id="graphNodeCount">0</span> nodes</span>
+                  <span class="graph-stat"><span class="graph-stat-icon">↗</span> <span id="graphEdgeCount">0</span> edges</span>
+                </div>
+                <button type="button" id="graphModeToggle" class="graph-ctrl-btn graph-mode-btn" title="Switch to 3D View">3D</button>
+                <button type="button" id="graphFitView" class="graph-ctrl-btn" title="Fit to View">⊙</button>
+                <button type="button" id="graphMinimize" class="graph-ctrl-btn" title="Minimize">▁</button>
+                <button type="button" id="graphMaximize" class="graph-ctrl-btn" title="Maximize">□</button>
+                <button type="button" id="graphFullscreen" class="graph-ctrl-btn" title="Fullscreen">⛶</button>
+              </div>
+              <div id="graph-container">
+                <div class="graph-stabilizing" id="graphStabilizing">
+                  <div class="graph-stabilizing-spinner"></div>
+                  <span>Stabilizing layout…</span>
+                </div>
+              </div>
+              <div class="graph-legend" id="graphLegend">
+                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#a855f7;box-shadow:0 0 6px #a855f766;"></span>Root</div>
+                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#6366f1;box-shadow:0 0 6px #6366f166;"></span>Group</div>
+                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#10b981;box-shadow:0 0 6px #10b98166;"></span>Module</div>
+                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#fbbf24;box-shadow:0 0 6px #fbbf2466;"></span>Sprint</div>
+                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#22d3ee;box-shadow:0 0 6px #22d3ee66;"></span>File</div>
+                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#71717a;box-shadow:0 0 6px #71717a66;"></span>Config</div>
+              </div>
             </div>
           </div>
 
@@ -343,6 +381,7 @@
             <button type="button" data-action="artifact">View Artifact</button>
             <button type="button" id="toggleArtifactView">Show More</button>
             <button type="button" data-action="editArtifact">Edit Artifact</button>
+            <button type="button" data-action="openRefineModal">🪄 AI Refine</button>
             <button type="button" data-action="previewUpdate">Preview Update</button>
             <div id="artifactEditForm" class="artifact-edit-form">
               <textarea id="artifactEditText"></textarea>
@@ -352,6 +391,24 @@
               </div>
             </div>
             <pre id="artifactView">Select an artifact.</pre>
+          </div>
+
+          <!-- AI Refine Modal -->
+          <div class="export-modal-overlay" id="refineModalOverlay">
+            <div class="export-modal">
+              <div class="export-modal-header">
+                <h2>🪄 AI Refine Artifact</h2>
+                <button class="export-modal-close" id="refineModalClose">&times;</button>
+              </div>
+              <div class="export-modal-body">
+                <label>Vibe (What to change?)</label>
+                <textarea id="refineVibe" style="width:100%;height:100px;background:#050610;color:white;padding:10px;"></textarea>
+              </div>
+              <div class="export-modal-footer">
+                <button class="export-cancel-btn" id="refineCancelBtn">Cancel</button>
+                <button class="export-execute-btn" id="refineExecuteBtn">Refine</button>
+              </div>
+            </div>
           </div>
 
           <div class="log-panel">

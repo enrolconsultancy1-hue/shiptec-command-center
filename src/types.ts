@@ -16,8 +16,14 @@ export interface IntakeInput {
   knownRisks: string[];
   openQuestions: string[];
   gitUrl?: string;
-  skillsUrl?: string;
-  knowledgeUrl?: string;
+  skillsUrl?: string[];
+  knowledgeUrl?: string[];
+  budget?: string;
+  timeline?: string;
+  compliance?: string;
+  generateLegalDocs?: boolean;
+  brandColors?: string;
+  typography?: string;
 }
 
 export interface ProjectRecord {
@@ -133,3 +139,5 @@ export interface HandoffExportResult {
   filesIncluded: string[];
   destinationPath?: string;
 }
+
+export type TreeNode = FolderTreeNode;

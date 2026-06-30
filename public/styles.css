@@ -1875,3 +1875,332 @@ aside.panel {
     grid-template-columns: 1fr;
   }
 }
+
+/* Tree & Graph Tabs */
+.tree-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tree-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tree-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tree-tab-btn.active {
+  color: var(--primary-color);
+  background: var(--primary-glow);
+  box-shadow: inset 0 0 0 1px rgba(0, 128, 255, 0.2);
+}
+
+/* ─── Graph Wrapper & Controls ─────────────────────────── */
+.graph-wrapper {
+  display: none;
+  flex-direction: column;
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.graph-wrapper.visible {
+  display: flex;
+}
+
+/* Graph Controls Bar */
+.graph-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(5, 6, 16, 0.82);
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 5;
+}
+
+/* Graph Stats in Control Bar */
+.graph-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-right: auto;
+}
+
+.graph-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.graph-stat-icon {
+  font-size: 11px;
+  color: var(--info-color);
+  opacity: 0.7;
+}
+
+.graph-ctrl-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.graph-ctrl-btn:hover {
+  background: var(--primary-glow);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  box-shadow: 0 0 8px var(--primary-glow);
+  transform: scale(1.1);
+}
+
+.graph-ctrl-btn.active {
+  background: rgba(0, 128, 255, 0.15);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+/* Mode Toggle Button (2D/3D) */
+.graph-mode-btn {
+  width: auto;
+  padding: 0 10px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.graph-mode-btn.active {
+  background: rgba(0, 255, 204, 0.15);
+  border-color: var(--success-color);
+  color: var(--success-color);
+  box-shadow: 0 0 8px var(--success-glow);
+}
+
+/* ─── Graph Container ─────────────────────────────────── */
+#graph-container {
+  width: 100%;
+  height: 400px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 128, 255, 0.03) 0%, transparent 70%),
+    radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px;
+  background-color: #020308;
+  border: 1px solid var(--border-color);
+  border-top: none;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+  transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* vis-network canvas should fill the container */
+#graph-container canvas {
+  display: block;
+}
+
+/* ─── Stabilization Overlay ────────────────────────────── */
+.graph-stabilizing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(2, 3, 8, 0.85);
+  z-index: 10;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.graph-stabilizing.hidden {
+  opacity: 0;
+}
+
+.graph-stabilizing-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid rgba(255, 255, 255, 0.06);
+  border-top-color: var(--info-color);
+  border-radius: 50%;
+  animation: graphSpin 0.8s linear infinite;
+}
+
+@keyframes graphSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Graph Legend ─────────────────────────────────────── */
+.graph-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 8px 14px;
+  background: rgba(5, 6, 16, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 6;
+  max-width: 280px;
+  pointer-events: none;
+}
+
+.graph-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.graph-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Minimized State ──────────────────────────────────── */
+.graph-wrapper.minimized #graph-container {
+  height: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.graph-wrapper.minimized .graph-legend {
+  display: none;
+}
+
+.graph-wrapper.minimized .graph-controls {
+  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* ─── Maximized State ──────────────────────────────────── */
+.graph-wrapper.maximized #graph-container {
+  height: 650px;
+}
+
+/* ─── Fullscreen State ─────────────────────────────────── */
+.graph-wrapper.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  border-radius: 0;
+  background: #020308;
+  animation: graphFullscreenIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.graph-wrapper.fullscreen .graph-controls {
+  border-radius: 0;
+  padding: 12px 20px;
+  background: rgba(5, 6, 16, 0.9);
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.graph-wrapper.fullscreen #graph-container {
+  height: calc(100vh - 52px);
+  border: none;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 128, 255, 0.04) 0%, transparent 60%),
+    radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 24px 24px;
+  background-color: #020308;
+}
+
+.graph-wrapper.fullscreen .graph-legend {
+  bottom: 20px;
+  left: 20px;
+  padding: 10px 18px;
+  font-size: 11px;
+}
+
+@keyframes graphFullscreenIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Fullscreen close hint */
+.graph-wrapper.fullscreen .graph-controls::before {
+  content: 'SHIPTEC KNOWLEDGE GRAPH — Press ESC or ⛶ to exit';
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-right: auto;
+}
+
+/* Hide the stats when fullscreen hint takes over margin-right:auto */
+.graph-wrapper.fullscreen .graph-stats {
+  display: none;
+}
+

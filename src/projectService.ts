@@ -1,9 +1,10 @@
 import path from "node:path";
+import { readdir, stat } from "node:fs/promises";
 import { Octokit } from "@octokit/rest";
 import { z } from "zod";
 import { artifactExists, readArtifactText, readArtifactTextIfExists, writeArtifact, writeArtifactIfMissing } from "./artifactStore.js";
 import { badRequest, notFound } from "./errors.js";
-import { FolderTreeNode, ProjectLifecycleStatus, ProjectRecord, ProjectScan, SprintAcceptanceInput, SprintAcceptanceResult, SprintArtifacts, SprintRecord } from "./types.js";
+import { FolderTreeNode, ProjectLifecycleStatus, ProjectRecord, ProjectScan, SprintAcceptanceInput, SprintAcceptanceResult, SprintArtifacts, SprintRecord, ValidationReport } from "./types.js";
 import { saveProject, findProject, readProjects } from "./projectStore.js";
 import { commitSprint, pushSprint, gitStatus, setupRemoteRepository } from "./gitService.js";
 import { calculateHealth } from "./health.js";
@@ -402,6 +403,10 @@ export async function previewArtifactUpdate(project: ProjectRecord, relativePath
 }
 
 function isArtifactReadable(relativePath: string): boolean {
+  // Allow any file within the Sprints/Sprint_XXX/ directory
+  if (/^Sprints\/Sprint_\d{3}\/.*\.md$/.test(relativePath)) {
+    return true;
+  }
   return getAllowedArtifactPaths().includes(relativePath);
 }
 
@@ -501,6 +506,16 @@ export async function validateDryRun(project: ProjectRecord, sprintId: string): 
   if (status === "pass") findings.push("Dry run operations align with sprint scope.");
 
   return { status, findings };
+}
+
+export async function listSprints(project: ProjectRecord): Promise<string[]> {
+  const sprintsDir = path.join(project.rootPath, "Sprints");
+  try {
+    const entries = await import("node:fs/promises").then(fs => fs.readdir(sprintsDir));
+    return entries.filter(name => /^Sprint_\d{3}$/.test(name)).sort();
+  } catch {
+    return [];
+  }
 }
 
 export async function createSprint(project: ProjectRecord, sprintNumber: number): Promise<SprintRecord> {
@@ -649,8 +664,59 @@ ${new Date().toISOString()} - Commit created (hash: ${commit.hash}), Push ${pars
   return result;
 }
 
-export async function updateValidationReport(project: ProjectRecord): Promise<string> {
-  const markdown = reportMarkdown(validateIntake(project.intake));
+export async function validateProject(project: ProjectRecord): Promise<ValidationReport> {
+  const report = validateIntake(project.intake);
+  
+  // Check for URL Authorization status
+  let authStatus: "pending" | "authorized" | "rejected" = "pending";
+  let flaggedUrls: string[] = [];
+  const skillsUrls = project.intake.skillsUrl || [];
+  const knowledgeUrls = project.intake.knowledgeUrl || [];
+  const totalUrls = skillsUrls.length + knowledgeUrls.length;
+  
+  if (totalUrls > 0) {
+    try {
+      const authData = await readArtifactTextIfExists(project, "Planning/Governance/Authorized_URLs.json");
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        authStatus = parsed.flagged && parsed.flagged.length > 0 ? "rejected" : "authorized";
+        flaggedUrls = parsed.flagged || [];
+      }
+    } catch {
+      authStatus = "pending";
+    }
+
+    if (authStatus === "pending") {
+      report.findings.push({
+        status: "warning",
+        field: "urlAuthorization",
+        message: `URL Authorization scan is pending. Run URL scan to verify safety for ${totalUrls} configured URL(s).`
+      });
+      if (report.status === "pass") {
+        report.status = "warning";
+      }
+    } else if (authStatus === "rejected") {
+      report.findings.push({
+        status: "fail",
+        field: "urlAuthorization",
+        message: `SkillSpector flagged security risks in the following URL(s): ${flaggedUrls.join(", ")}. Please review or replace them.`
+      });
+      report.status = "fail";
+    } else if (authStatus === "authorized") {
+      report.findings.push({
+        status: "pass",
+        field: "urlAuthorization",
+        message: `All ${totalUrls} URL(s) scanned and authorized by SkillSpector.`
+      });
+    }
+  }
+
+  return report;
+}
+
+export async function updateValidationReport(project: ProjectRecord, report?: ValidationReport): Promise<string> {
+  const finalReport = report || await validateProject(project);
+  const markdown = reportMarkdown(finalReport);
   await writeArtifact(project, "Planning/Validation_Report.md", markdown);
   return markdown;
 }
@@ -704,19 +770,18 @@ function slugify(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "shiptec-project";
 }
 
-export async function getProjectTree(project: ProjectRecord, maxDepth: number = 5): Promise<FolderTreeNode[]> {
+export async function getProjectTree(project: ProjectRecord, maxDepth: number = 8): Promise<FolderTreeNode[]> {
   if (useFirestoreBackend()) {
     return [{ name: project.id, type: "directory", relativePath: ".", children: [{ name: "(Firestore virtual storage)", type: "file", relativePath: "virtual" }] }];
   }
 
-  const fs = await import("node:fs/promises");
-  const IGNORED = new Set(["node_modules", ".git", ".shiptec", ".shiptec-handoff"]);
+  const IGNORED = new Set(["node_modules", ".git", ".shiptec-handoff", "dist", "coverage"]);
 
   async function walk(dirPath: string, relativeTo: string, depth: number): Promise<FolderTreeNode[]> {
     if (depth > maxDepth) return [];
     let entries;
     try {
-      entries = await fs.readdir(dirPath, { withFileTypes: true });
+      entries = await readdir(dirPath, { withFileTypes: true });
     } catch {
       return [];
     }
@@ -739,7 +804,7 @@ export async function getProjectTree(project: ProjectRecord, maxDepth: number = 
       } else {
         let size: number | undefined;
         try {
-          const stats = await fs.stat(fullPath);
+          const stats = await stat(fullPath);
           size = stats.size;
         } catch { /* ignore */ }
         nodes.push({ name: entry.name, type: "file", relativePath: relPath, size });

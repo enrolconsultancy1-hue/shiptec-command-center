@@ -21,8 +21,8 @@ export async function authorizeUrls(project: ProjectRecord): Promise<{
   report: string;
 }> {
   const urls = [
-    ...project.intake.skillsUrl,
-    ...project.intake.knowledgeUrl,
+    ...(project.intake.skillsUrl || []),
+    ...(project.intake.knowledgeUrl || []),
   ];
 
   const uniqueUrls = [...new Set(urls)].filter(Boolean);
@@ -54,22 +54,57 @@ export async function authorizeUrls(project: ProjectRecord): Promise<{
 }
 
 async function scanUrl(url: string): Promise<ScanResult> {
+  let stdoutStr = "";
   try {
     // Attempt to use the actual SkillSpector CLI if available
     // We use a timeout and a fallback to ensure zero-error stability
-    const { stdout } = await execPromise(`skillspector scan ${url} --format json --no-llm`, { timeout: 10000 });
-    const output = JSON.parse(stdout);
+    const { stdout } = await execPromise(`skillspector scan "${url}" --format json --no-llm`, { timeout: 30000 });
+    stdoutStr = stdout;
+  } catch (error: any) {
+    // If the command exited with non-zero exit code due to finding issues, stdout is in error.stdout
+    if (error && typeof error.stdout === "string" && error.stdout.trim()) {
+      stdoutStr = error.stdout;
+    } else {
+      // Fallback if execution failed completely (e.g. CLI not found or syntax error)
+      return performInternalAnalysis(url);
+    }
+  }
+
+  try {
+    const output = JSON.parse(stdoutStr);
     
+    // SkillSpector's JSON format uses:
+    // output.risk_assessment.score (0-100) or output.riskScore
+    // output.issues (array of findings) or output.findings
+    const rawScore = output.risk_assessment?.score !== undefined 
+      ? output.risk_assessment.score 
+      : (output.riskScore !== undefined ? output.riskScore : 0);
+      
+    const issues = output.issues || output.findings || [];
+    const findings = Array.isArray(issues)
+      ? issues.map((issue: any) => {
+          if (typeof issue === "string") return issue;
+          const severity = issue.severity ? `[${issue.severity}] ` : "";
+          const pattern = issue.pattern || "";
+          const fileInfo = issue.location?.file ? ` in ${issue.location.file}` : "";
+          return `${severity}${pattern}${fileInfo}`;
+        })
+      : [];
+
+    // Map 0-100 score to 0-10 scale for UI report consistency (which uses score/10)
+    const riskScore = Math.round(rawScore / 10);
+    // Standard threshold: rawScore < 30 is Authorized (equivalent to riskScore < 3)
+    const status = rawScore < 30 ? "Authorized" : "Flagged";
+    const license = url.includes("github.com") ? "OSS (likely MIT/Apache)" : "Unknown";
+
     return {
       url,
-      status: output.riskScore < 3 ? "Authorized" : "Flagged",
-      riskScore: output.riskScore || 0,
-      findings: output.findings || [],
-      license: output.license || "Unknown"
+      status,
+      riskScore,
+      findings,
+      license
     };
-  } catch (error) {
-    // FALLBACK: High-Fidelity Internal Analysis
-    // This ensures the feature works even if Python deps are broken or offline
+  } catch (parseError) {
     return performInternalAnalysis(url);
   }
 }
