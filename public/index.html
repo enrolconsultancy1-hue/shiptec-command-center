@@ -411,6 +411,43 @@
             </div>
           </div>
 
+          <div class="proposal-panel">
+            <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h3>Proposal Factory</h3>
+              <select id="proposalSelect" style="background: #050610; color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 4px; font-size: 11px;">
+                <option value="">No proposals</option>
+              </select>
+            </div>
+            <div class="form-actions" style="margin-bottom: 12px; display: flex; gap: 8px;">
+              <button type="button" id="generateProposalBtn" class="btn-primary" style="flex: 1; padding: 6px; font-size: 11px; background: var(--primary-glow); border: 1px solid var(--primary-color); color: var(--primary-color); border-radius: 4px; cursor: pointer;">⚡ Generate</button>
+              <button type="button" id="viewProposalBtn" class="btn-secondary" style="flex: 1; padding: 6px; font-size: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 4px; cursor: pointer;">View Proposal</button>
+            </div>
+            
+            <div id="proposalQualityContainer" style="display: none; margin-bottom: 12px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; color: #94a3b8; display: flex; justify-content: space-between;">
+                <span>Quality Score:</span>
+                <strong><span id="proposalOverallScore">0</span> / 10</strong>
+              </h4>
+              <div class="quality-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;" id="qualityGrid">
+                <!-- Gauges filled in by JS -->
+              </div>
+            </div>
+
+            <div class="export-toolbar" id="proposalExportToolbar" style="display: none; flex-direction: column; gap: 6px; margin-bottom: 12px; padding: 8px; background: #050610; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.1);">
+              <span style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: bold; margin-bottom: 2px;">Export Proposal:</span>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
+                <button type="button" class="export-btn" data-format="pdf" style="background:#e11d4822; color:#fb7185; border:1px solid #f43f5e44; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="Adobe PDF (Puppeteer)">📄 PDF</button>
+                <button type="button" class="export-btn" data-format="docx" style="background:#2563eb22; color:#60a5fa; border:1px solid #3b82f644; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="Microsoft Word (docx)">📝 Word</button>
+                <button type="button" class="export-btn" data-format="xlsx" style="background:#16a34a22; color:#4ade80; border:1px solid #22c55e44; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="Microsoft Excel (ExcelJS)">📊 Excel</button>
+                <button type="button" class="export-btn" data-format="google-sheets" style="background:#05966922; color:#34d399; border:1px solid #10b98144; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="Google Sheet URL">📈 Sheets</button>
+                <button type="button" class="export-btn" data-format="pptx" style="background:#ea580c22; color:#f97316; border:1px solid #f9731644; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="PowerPoint (PptxGenJS)">🎯 PPTX</button>
+                <button type="button" class="export-btn" data-format="html" style="background:#4f46e522; color:#818cf8; border:1px solid #6366f144; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="Styled HTML">🌐 HTML</button>
+                <button type="button" class="export-btn" data-format="csv" style="background:#7c3aed22; color:#a78bfa; border:1px solid #8b5cf644; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="ZIP of CSV tables">📋 CSV</button>
+                <button type="button" class="export-btn" data-format="rtf" style="background:#db277722; color:#f472b6; border:1px solid #ec489944; padding:4px; font-size:10px; border-radius:4px; cursor:pointer;" title="Rich Text (RTF)">📃 RTF</button>
+              </div>
+            </div>
+          </div>
+
           <div class="log-panel">
             <h3>Activity</h3>
             <pre id="activityLog">Ready.</pre>

@@ -1,12 +1,23 @@
-node_modules/
-dist/
-.npm-cache/
-.shiptec/
+# LLM API Keys and Configuration
+# DO NOT commit these files
 .env
-.DS_Store
-coverage/
-server.*.log
+.env.local
+.env.development
+.env.test
+.env.production
+*.key
+*.secret
 
-# Local Firebase/GCloud credentials
+test-results
+.DS_Store
+node_modules
+dist/
+
+# Firebase / GCloud credentials and caches
 .firebase-config/
 .gcloud-config/
+.npm-cache/
+.shiptec/
+
+# Generated reports
+project_report.txt

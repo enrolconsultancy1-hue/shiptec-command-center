@@ -2,29 +2,11 @@ export type ValidationStatus = "pass" | "warning" | "fail";
 
 export type ProjectLifecycleStatus = "fresh" | "initialized" | "in_progress" | "handed_over";
 
-export interface IntakeInput {
-  projectName: string;
-  productSummary: string;
-  businessProblem: string;
-  targetUsers: string[];
-  currentWorkflow: string;
-  desiredWorkflow: string;
-  toolsAndIntegrations: string[];
-  technicalConstraints: string[];
-  successCriteria: string[];
-  mvpDefinition: string;
-  knownRisks: string[];
-  openQuestions: string[];
-  gitUrl?: string;
-  skillsUrl?: string[];
-  knowledgeUrl?: string[];
-  budget?: string;
-  timeline?: string;
-  compliance?: string;
-  generateLegalDocs?: boolean;
-  brandColors?: string;
-  typography?: string;
-}
+// IntakeInput is now derived from the canonical Zod schema in schemas/intakeSchema.ts.
+// Imported here so ProjectRecord can reference it; re-exported so the 15+ consumers
+// importing from types.js continue to work.
+import type { IntakeInput } from "./schemas/intakeSchema.js";
+export type { IntakeInput };
 
 export interface ProjectRecord {
   id: string;

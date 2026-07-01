@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { badRequest } from "./errors.js";
+import { badRequest, conflict } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
 import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, getProjectTree, initializeProject, listProjects, listSprints, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateProjectStatus, updateValidationReport, validateDryRun, validateProject } from "./projectService.js";
@@ -10,6 +10,9 @@ import { createHandoffPackage, exportHandoffPackage } from "./handoffService.js"
 import { refineArtifact } from "./refinementService.js";
 import { validateIntake } from "./validation.js";
 import type { ExportFormat, TargetEditor } from "./types.js";
+import { generateProposal, listProposals, readProposal } from "./services/proposalService.js";
+// readProposal is used directly in the export route to enforce the Confidence Gate.
+import { exportProposal } from "./services/proposalExportService.js";
 
 export const router = Router();
 
@@ -318,6 +321,94 @@ router.post("/projects/:id/builder-dry-run", async (request, response, next) => 
     const body = sprintBodySchema.parse(request.body ?? {});
     const sprint = await createSprint(project, body.sprintNumber);
     response.status(201).json({ sprint });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects/:id/proposals/generate", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const proposal = await generateProposal(project);
+    response.status(201).json({ proposal });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/projects/:id/proposals", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const proposals = await listProposals(project);
+    response.json({ proposals });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/projects/:id/proposals/:proposalId", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const proposal = await readProposal(project, request.params.proposalId);
+    response.json({ proposal });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const proposalExportBodySchema = z.object({
+  format: z.enum(["pdf", "docx", "xlsx", "pptx", "html", "csv", "rtf", "odp", "google-sheets"]),
+  options: z.object({
+    brandColors: z.string().optional(),
+    typography: z.string().optional(),
+    includeAppendices: z.boolean().optional(),
+    googleCredentials: z.object({
+      type: z.enum(["service_account", "oauth2"]),
+      keyFilePath: z.string().optional(),
+      accessToken: z.string().optional()
+    }).optional(),
+    shareWith: z.array(z.string().email()).optional(),
+    /** Explicit opt-in to export a DRAFT proposal despite blocking assumptions. */
+    force: z.boolean().optional()
+  }).optional()
+});
+
+router.post("/projects/:id/proposals/:proposalId/export", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const body = proposalExportBodySchema.parse(request.body);
+    const force = body.options?.force === true;
+
+    // Confidence Gate: refuse to produce a funder-facing document while
+    // funder-critical business data is still ASSUMED, unless the caller
+    // explicitly opts in with options.force (acknowledging it is a DRAFT).
+    const proposal = await readProposal(project, request.params.proposalId);
+    if (proposal.confidence.status === "blocked" && !force) {
+      throw conflict(
+        "Proposal is DRAFT: unresolved blocking assumptions prevent export.",
+        {
+          readiness: proposal.metadata.readiness,
+          blockingAssumptionIds: proposal.confidence.blockingAssumptionIds,
+          reasons: proposal.confidence.reasons,
+          resolution: "Resolve the blocking assumptions and regenerate, or re-send the request with options.force=true to export an explicitly-labelled DRAFT."
+        }
+      );
+    }
+
+    const result = await exportProposal(project, request.params.proposalId, body.format as any, body.options);
+
+    if (result.url) {
+      response.json({ url: result.url, filename: result.filename });
+    } else if (result.buffer) {
+      response.setHeader("Content-Type", result.mimeType);
+      response.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+      response.setHeader("Content-Length", result.buffer.length);
+      response.end(result.buffer);
+    } else {
+      response.setHeader("Content-Type", result.mimeType);
+      response.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+      response.end(result.content);
+    }
   } catch (error) {
     next(error);
   }

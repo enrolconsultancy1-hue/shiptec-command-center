@@ -1610,9 +1610,58 @@ aside.panel {
 }
 
 .export-dest-input:focus {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 12px rgba(0, 128, 255, 0.15);
+  border-color: var(--primary-hover);
+  box-shadow: 0 0 14px rgba(0, 128, 255, 0.25);
 }
+
+/* Proposal Factory Custom Cockpit Styles */
+.proposal-panel {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.proposal-panel:hover {
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-md);
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.export-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  filter: brightness(1.15);
+}
+
+.export-btn:active {
+  transform: translateY(0);
+}
+
+.quality-grid div {
+  transition: all 0.2s ease;
+}
+
+.quality-grid div:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  transform: scale(1.05);
+}
+
 
 .export-dest-input::placeholder {
   color: rgba(156, 163, 175, 0.5);

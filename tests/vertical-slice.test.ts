@@ -9,8 +9,11 @@ import { gitStatus } from "../src/gitService.js";
 import { acceptSprint, initializeProject, readProjectArtifact, scanProject } from "../src/projectService.js";
 import { validateIntake } from "../src/validation.js";
 import { exportHandoffPackage } from "../src/handoffService.js";
+import { INTAKE_DEFAULTS } from "../src/schemas/intakeSchema.js";
+import type { IntakeInput } from "../src/types.js";
 
-const intake = {
+const intake: IntakeInput = {
+  ...INTAKE_DEFAULTS,
   projectName: "Demo Factory",
   productSummary: "A governed command center for AI software delivery.",
   businessProblem: "AI coding work drifts without explicit planning and validation.",
@@ -470,6 +473,125 @@ describe("Shiptec API contract", () => {
       expect(exportResponse.headers.get("content-type")).toBe("application/zip");
       const buffer = await exportResponse.arrayBuffer();
       expect(buffer.byteLength).toBeGreaterThan(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("generates an honest DRAFT proposal, blocks export, and allows forced export", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-proposal-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "demo-factory"),
+        intake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+      const projectId = initBody.project.id;
+
+      // 1. Generate proposal
+      const genResponse = await postJson(`${server.url}/projects/${projectId}/proposals/generate`, {});
+      expect(genResponse.status).toBe(201);
+      const genBody = await genResponse.json() as { proposal: any };
+      expect(genBody.proposal.metadata.proposalId).toBe("Proposal_001");
+      expect(genBody.proposal.quality.overallScore).toBeGreaterThan(0);
+
+      // HONESTY: an intake with no business data must produce a DRAFT with a
+      // blocked Confidence Gate and a non-empty Assumption Register.
+      expect(genBody.proposal.metadata.readiness).toBe("DRAFT");
+      expect(genBody.proposal.confidence.status).toBe("blocked");
+      expect(Array.isArray(genBody.proposal.assumptions)).toBe(true);
+      expect(genBody.proposal.assumptions.length).toBeGreaterThan(0);
+      // The fabricated "$36,200" budget must NEVER appear anywhere.
+      expect(JSON.stringify(genBody.proposal)).not.toContain("36,200");
+
+      // 2. List proposals
+      const listResponse = await fetch(`${server.url}/projects/${projectId}/proposals`);
+      expect(listResponse.status).toBe(200);
+      const listBody = await listResponse.json() as { proposals: any[] };
+      expect(listBody.proposals.length).toBe(1);
+      expect(listBody.proposals[0].id).toBe("Proposal_001");
+
+      // 3. Read proposal — assert the Assumption Register appendix is embedded.
+      const readResponse = await fetch(`${server.url}/projects/${projectId}/proposals/Proposal_001`);
+      expect(readResponse.status).toBe(200);
+      const readBody = await readResponse.json() as { proposal: any };
+      expect(readBody.proposal.metadata.proposalId).toBe("Proposal_001");
+      expect(readBody.proposal.fullMarkdown).toContain("Executive Summary");
+      expect(readBody.proposal.fullMarkdown).toContain("Assumption Register");
+
+      // 4. Export WITHOUT force → blocked by the Confidence Gate (409).
+      const blockedResponse = await postJson(`${server.url}/projects/${projectId}/proposals/Proposal_001/export`, {
+        format: "html"
+      });
+      expect(blockedResponse.status).toBe(409);
+      const blockedBody = await blockedResponse.json() as { error: { code: string; details: any } };
+      expect(blockedBody.error.code).toBe("CONFLICT");
+      expect(blockedBody.error.details.blockingAssumptionIds.length).toBeGreaterThan(0);
+
+      // 5. Export WITH force → succeeds as an explicitly-labelled DRAFT.
+      const exportHtmlResponse = await postJson(`${server.url}/projects/${projectId}/proposals/Proposal_001/export`, {
+        format: "html",
+        options: { force: true }
+      });
+      expect(exportHtmlResponse.status).toBe(200);
+      const htmlContent = await exportHtmlResponse.text();
+      expect(htmlContent).toContain("<!doctype html>");
+
+      // 6. Export CSV WITH force → succeeds.
+      const exportCsvResponse = await postJson(`${server.url}/projects/${projectId}/proposals/Proposal_001/export`, {
+        format: "csv",
+        options: { force: true }
+      });
+      expect(exportCsvResponse.status).toBe(200);
+      expect(exportCsvResponse.headers.get("content-type")).toBe("application/zip");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("promotes a proposal to FINAL when the intake supplies all funder-critical data", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "shiptec-final-"));
+    process.env.SHIPTEC_REGISTRY_PATH = path.join(workspace, ".shiptec", "projects.json");
+    const server = await startTestServer();
+
+    try {
+      const fullIntake = {
+        ...intake,
+        organization: "Tectagrand Industries",
+        country: "United States",
+        industry: "Information Technology",
+        fundingType: "Grant",
+        budget: "$50,000",
+        marketSize: "$2B addressable market",
+        competitors: ["Legacy ERP Inc."],
+        competitiveAdvantage: "Governed, auditable delivery.",
+        valueProposition: "Zero-drift software factory.",
+        revenueModel: "SaaS subscription"
+      };
+      const initResponse = await postJson(`${server.url}/projects/init`, {
+        rootPath: path.join(workspace, "final-factory"),
+        intake: fullIntake
+      });
+      const initBody = await initResponse.json() as { project: { id: string } };
+      const projectId = initBody.project.id;
+
+      const genResponse = await postJson(`${server.url}/projects/${projectId}/proposals/generate`, {});
+      expect(genResponse.status).toBe(201);
+      const genBody = await genResponse.json() as { proposal: any };
+
+      // Fully-supplied business data → no blocking assumptions → FINAL.
+      expect(genBody.proposal.metadata.readiness).toBe("FINAL");
+      expect(genBody.proposal.confidence.status).toBe("pass");
+      expect(genBody.proposal.confidence.blockingAssumptionIds).toEqual([]);
+
+      // And export works WITHOUT force, because nothing is blocking.
+      const exportResponse = await postJson(`${server.url}/projects/${projectId}/proposals/Proposal_001/export`, {
+        format: "html"
+      });
+      expect(exportResponse.status).toBe(200);
     } finally {
       await server.close();
     }

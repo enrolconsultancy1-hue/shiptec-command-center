@@ -433,6 +433,7 @@ async function loadProjects() {
     populateIntakeForm(activeProject.intake);
     updateArtifactSelectOptions();
     await loadSprints(); // Load dynamic sprints
+    await loadProposals(); // Load proposals
     await scan();
     await git();
     await getGitHubStatus();
@@ -961,6 +962,7 @@ if (projectSelect) {
     await scan();
     await git();
     await getGitHubStatus();
+    await loadProposals();
   });
 }
 
@@ -2180,4 +2182,202 @@ if (graphModeToggleBtn) {
     }
   });
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PROPOSAL FACTORY COCKPIT HANDLERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+const proposalSelect = document.getElementById("proposalSelect");
+const generateProposalBtn = document.getElementById("generateProposalBtn");
+const viewProposalBtn = document.getElementById("viewProposalBtn");
+const proposalQualityContainer = document.getElementById("proposalQualityContainer");
+const proposalOverallScore = document.getElementById("proposalOverallScore");
+const qualityGrid = document.getElementById("qualityGrid");
+const proposalExportToolbar = document.getElementById("proposalExportToolbar");
+
+async function loadProposals() {
+  if (!proposalSelect) return;
+  try {
+    const payload = await request(`/projects/${activeProjectId}/proposals`);
+    proposalSelect.innerHTML = '<option value="">No proposals</option>';
+    
+    if (payload.proposals && payload.proposals.length > 0) {
+      proposalSelect.innerHTML = "";
+      for (const prop of payload.proposals) {
+        const option = document.createElement("option");
+        option.value = prop.id;
+        // overallScore is null when metadata.json is missing/unreadable — render
+        // "unknown" rather than a fabricated number.
+        option.textContent = `${prop.id} (${prop.overallScore === null ? "unknown" : prop.overallScore + "/10"})`;
+        proposalSelect.append(option);
+      }
+      if (proposalExportToolbar) proposalExportToolbar.style.display = "flex";
+      if (proposalQualityContainer) proposalQualityContainer.style.display = "block";
+      await loadProposalDetails(proposalSelect.value);
+    } else {
+      if (proposalExportToolbar) proposalExportToolbar.style.display = "none";
+      if (proposalQualityContainer) proposalQualityContainer.style.display = "none";
+    }
+  } catch (error) {
+    log("Failed to load proposals", String(error));
+  }
+}
+
+async function loadProposalDetails(proposalId) {
+  if (!proposalId) return;
+  try {
+    const payload = await request(`/projects/${activeProjectId}/proposals/${proposalId}`);
+    const quality = payload.proposal.quality;
+    
+    if (proposalOverallScore) proposalOverallScore.textContent = quality.overallScore;
+    
+    if (qualityGrid) {
+      qualityGrid.innerHTML = "";
+      quality.dimensions.forEach(dim => {
+        const item = document.createElement("div");
+        item.style.textAlign = "center";
+        item.style.padding = "4px";
+        item.style.background = "rgba(255,255,255,0.02)";
+        item.style.border = "1px solid rgba(255,255,255,0.05)";
+        item.style.borderRadius = "4px";
+        item.title = `${dim.label}: ${dim.score}/10\n${dim.weakness || "Passed threshold"}`;
+        
+        const scoreColor = dim.score >= 9 ? "#4ade80" : dim.score >= 7.5 ? "#f97316" : "#fb7185";
+        
+        item.innerHTML = `
+          <div style="font-size: 8px; text-transform: uppercase; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${dim.label.split(" ")[0]}</div>
+          <div style="font-size: 11px; font-weight: bold; color: ${scoreColor}; margin-top: 2px;">${dim.score}</div>
+        `;
+        qualityGrid.appendChild(item);
+      });
+    }
+  } catch (error) {
+    log("Failed to load proposal details", String(error));
+  }
+}
+
+if (proposalSelect) {
+  proposalSelect.addEventListener("change", async () => {
+    await loadProposalDetails(proposalSelect.value);
+  });
+}
+
+if (generateProposalBtn) {
+  generateProposalBtn.addEventListener("click", async () => {
+    showLoading("Generating proposal and validating quality dimensions...");
+    try {
+      const payload = await request(`/projects/${activeProjectId}/proposals/generate`, { method: "POST" });
+      log("Proposal generated", payload.proposal);
+      showNotification(`Proposal ${payload.proposal.metadata.proposalId} generated successfully. Quality Score: ${payload.proposal.quality.overallScore}`, "success", 4000);
+      await loadProposals();
+      
+      // Select the new proposal
+      if (proposalSelect) {
+        proposalSelect.value = payload.proposal.metadata.proposalId;
+        await loadProposalDetails(payload.proposal.metadata.proposalId);
+      }
+      
+      // Auto-display proposal content in the artifact panel
+      if (artifactView) {
+        const filePayload = await request(`/projects/${activeProjectId}/artifacts?path=Proposals/${payload.proposal.metadata.proposalId}/Proposal.md`);
+        artifactView.textContent = filePayload.artifact.content;
+        showNotification(`Displaying Proposal.md`, "success", 2000);
+      }
+    } catch (error) {
+      log("Proposal generation failed", String(error));
+      showNotification("Failed to generate proposal: " + String(error), "error", 0);
+    } finally {
+      hideLoading();
+    }
+  });
+}
+
+if (viewProposalBtn) {
+  viewProposalBtn.addEventListener("click", async () => {
+    const propId = proposalSelect ? proposalSelect.value : "";
+    if (!propId) {
+      showNotification("No proposal generated yet. Click Generate first.", "warning", 3000);
+      return;
+    }
+    setPanelLoading(document.querySelector(".panel.command-panel"), true);
+    try {
+      const filePayload = await request(`/projects/${activeProjectId}/artifacts?path=Proposals/${propId}/Proposal.md`);
+      if (artifactView) artifactView.textContent = filePayload.artifact.content;
+      log("Proposal view loaded", { proposalId: propId });
+      showNotification(`Loaded Proposal: Proposals/${propId}/Proposal.md`, "success", 2000);
+    } catch (error) {
+      log("Proposal view load failed", String(error));
+      showNotification("Failed to load proposal file: " + String(error), "error", 0);
+    } finally {
+      setPanelLoading(document.querySelector(".panel.command-panel"), false);
+    }
+  });
+}
+
+// Export Proposal Event Handlers
+document.querySelectorAll("#proposalExportToolbar .export-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const propId = proposalSelect ? proposalSelect.value : "";
+    if (!propId) {
+      showNotification("Select or generate a proposal first.", "warning", 3000);
+      return;
+    }
+    const format = btn.dataset.format;
+    
+    // Setup credentials for google-sheets
+    let options = {};
+    if (format === "google-sheets") {
+      options = {
+        googleCredentials: {
+          type: "service_account",
+          keyFilePath: "dummy-key.json"
+        },
+        shareWith: ["owner@example.com"]
+      };
+    }
+
+    showLoading(`Exporting proposal as ${format.toUpperCase()}...`);
+    try {
+      const response = await fetch(`${apiBase}/projects/${activeProjectId}/proposals/${propId}/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format, options })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+
+      if (format === "google-sheets") {
+        const json = await response.json();
+        showNotification(`Cloud Sheet Exported! Opening Google Sheet: ${json.filename}`, "success", 5000);
+        window.open(json.url, "_blank");
+      } else {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        
+        const disposition = response.headers.get("content-disposition");
+        let filename = `${activeProjectId}_${propId}.${format}`;
+        if (disposition && disposition.indexOf("filename=") !== -1) {
+          filename = disposition.split("filename=")[1].replace(/"/g, "");
+        }
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showNotification(`Exported as ${format.toUpperCase()} successfully`, "success", 3000);
+      }
+    } catch (error) {
+      log(`Export to ${format} failed`, String(error));
+      showNotification(`Export failed: ${error.message || error}`, "error", 0);
+    } finally {
+      hideLoading();
+    }
+  });
+});
 

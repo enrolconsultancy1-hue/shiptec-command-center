@@ -5,6 +5,7 @@ import { z } from "zod";
 import { artifactExists, readArtifactText, readArtifactTextIfExists, writeArtifact, writeArtifactIfMissing } from "./artifactStore.js";
 import { badRequest, notFound } from "./errors.js";
 import { FolderTreeNode, ProjectLifecycleStatus, ProjectRecord, ProjectScan, SprintAcceptanceInput, SprintAcceptanceResult, SprintArtifacts, SprintRecord, ValidationReport } from "./types.js";
+import { intakeSchema } from "./schemas/intakeSchema.js";
 import { saveProject, findProject, readProjects } from "./projectStore.js";
 import { commitSprint, pushSprint, gitStatus, setupRemoteRepository } from "./gitService.js";
 import { calculateHealth } from "./health.js";
@@ -43,30 +44,6 @@ import {
   privacyPolicyTemplate
 } from "./templates.js";
 import { validateIntake } from "./validation.js";
-
-export const intakeSchema = z.object({
-  projectName: z.string().min(1),
-  productSummary: z.string().min(1),
-  businessProblem: z.string().min(1),
-  targetUsers: z.array(z.string().min(1)),
-  currentWorkflow: z.string().min(1),
-  desiredWorkflow: z.string().min(1),
-  toolsAndIntegrations: z.array(z.string()).default([]),
-  technicalConstraints: z.array(z.string()).default([]),
-  successCriteria: z.array(z.string().min(1)),
-  mvpDefinition: z.string().min(1),
-  knownRisks: z.array(z.string()).default([]),
-  openQuestions: z.array(z.string()).default([]),
-  budget: z.string().optional().default("Not specified"),
-  timeline: z.string().optional().default("Not specified"),
-  compliance: z.string().optional().default("None specified"),
-  generateLegalDocs: z.boolean().default(false),
-  brandColors: z.string().optional().default("Not specified"),
-  typography: z.string().optional().default("Not specified"),
-  gitUrl: z.string().url().optional().or(z.literal("")),
-  skillsUrl: z.array(z.string().url()).default([]),
-  knowledgeUrl: z.array(z.string().url()).default([]),
-});
 
 const initSchema = z.object({
   rootPath: z.string().min(1).optional(),
@@ -405,6 +382,10 @@ export async function previewArtifactUpdate(project: ProjectRecord, relativePath
 function isArtifactReadable(relativePath: string): boolean {
   // Allow any file within the Sprints/Sprint_XXX/ directory
   if (/^Sprints\/Sprint_\d{3}\/.*\.md$/.test(relativePath)) {
+    return true;
+  }
+  // Allow files within Proposals/Proposal_XXX/ directory
+  if (/^Proposals\/Proposal_\d{3}\/.+$/.test(relativePath)) {
     return true;
   }
   return getAllowedArtifactPaths().includes(relativePath);
