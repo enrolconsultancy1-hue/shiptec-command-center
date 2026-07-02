@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: Handoff Prompt
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:56.025Z
+---
+
 # Handoff Prompt
 
 You are the Builder for Shiptec Command Center.

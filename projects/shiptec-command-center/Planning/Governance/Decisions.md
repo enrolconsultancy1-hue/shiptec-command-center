@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: Decisions
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:56.019Z
+---
+
 # Decisions
 
 | Date | Decision | Rationale | Owner |

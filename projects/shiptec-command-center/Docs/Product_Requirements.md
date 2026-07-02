@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: Product Requirements
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:56.003Z
+---
+
 # Product Requirements
 
 ## Project

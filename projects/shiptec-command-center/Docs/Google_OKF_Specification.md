@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: Open Knowledge Format (OKF)
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:55.996Z
+---
+
 # Open Knowledge Format (OKF)
 
 **Version 0.1 — Draft**

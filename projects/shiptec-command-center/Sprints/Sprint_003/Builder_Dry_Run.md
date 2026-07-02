@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: Sprint_003 Builder Dry Run
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:56.057Z
+---
+
 # Sprint_003 Builder Dry Run
 
 ## Files To Read First

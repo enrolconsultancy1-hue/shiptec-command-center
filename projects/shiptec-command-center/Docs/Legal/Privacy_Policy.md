@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: PRIVACY POLICY
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:55.999Z
+---
+
 # PRIVACY POLICY
   
   ## Privacy Policy for School of the Future

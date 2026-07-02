@@ -48,14 +48,13 @@ router.get("/projects/:id/details", async (request, response, next) => {
     const project = await getProject(request.params.id);
     
     try {
-      const intakeSpec = await readProjectArtifact(project, "Planning/intake_spec.json");
-      if (intakeSpec) {
-        const parsed = JSON.parse(intakeSpec);
+      const intakeArtifact = await readProjectArtifact(project, "Planning/intake_spec.json");
+      if (intakeArtifact) {
+        const parsed = JSON.parse(intakeArtifact.content);
         return response.json({
           id: project.id,
           name: project.name,
           folder: project.rootPath || "",
-          gitUrl: project.gitUrl || "",
           intake: parsed
         });
       }
@@ -67,7 +66,6 @@ router.get("/projects/:id/details", async (request, response, next) => {
       id: project.id,
       name: project.name,
       folder: project.rootPath || "",
-      gitUrl: project.gitUrl || "",
       intake: project.intake
     });
   } catch (error) {

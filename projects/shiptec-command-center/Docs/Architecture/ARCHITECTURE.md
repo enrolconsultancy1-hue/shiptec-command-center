@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: ARCHITECTURE OVERVIEW
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:55.971Z
+---
+
 # ARCHITECTURE OVERVIEW
 
 ## System Topology

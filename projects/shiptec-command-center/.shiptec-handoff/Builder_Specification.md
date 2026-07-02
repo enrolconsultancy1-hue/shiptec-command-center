@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: 📦 SHIPTEC HANDOFF SPEC [V2-OPTIMIZED]
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:55.954Z
+---
+
 # 📦 SHIPTEC HANDOFF SPEC [V2-OPTIMIZED]
   
 ## 🆔 METADATA

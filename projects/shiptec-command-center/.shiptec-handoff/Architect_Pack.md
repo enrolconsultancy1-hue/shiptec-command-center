@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: Architect Pack
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:55.951Z
+---
+
 # Architect Pack
 
 ## Product Intent

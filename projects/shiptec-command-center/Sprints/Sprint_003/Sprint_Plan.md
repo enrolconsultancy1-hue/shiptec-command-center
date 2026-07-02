@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: Sprint_003 Sprint Plan
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:56.063Z
+---
+
 # Sprint_003 Sprint Plan
 
 ## Goal

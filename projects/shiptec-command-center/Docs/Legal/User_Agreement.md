@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: USER AGREEMENT
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:56.000Z
+---
+
 # USER AGREEMENT
   
   ## Agreement for School of the Future

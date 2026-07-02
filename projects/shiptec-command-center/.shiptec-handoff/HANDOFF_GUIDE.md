@@ -1,3 +1,11 @@
+---
+type: SHIPTEC Artifact
+title: 🧭 SHIPTEC HANDOFF GUIDE (Instructions for external AI Editors)
+description: Migrated artifact
+tags: [shiptec]
+timestamp: 2026-07-02T17:07:55.961Z
+---
+
 # 🧭 SHIPTEC HANDOFF GUIDE (Instructions for external AI Editors)
 
 > **FOR CO-PILOT, CURSOR, ANTIGRAVITY, OPEN CODE, OR CLAUDE CODE**
