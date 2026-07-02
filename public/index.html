@@ -125,7 +125,10 @@
             <label class="project-picker" style="position: relative;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                 <span>Known projects</span>
-                <button type="button" id="newProjectBtn" style="background: var(--primary-glow); border: 1px solid var(--primary-color); color: var(--primary-color); padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold;">+ New</button>
+                <div>
+                  <button type="button" id="newProjectBtn" style="background: var(--primary-glow); border: 1px solid var(--primary-color); color: var(--primary-color); padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold;">+ New</button>
+                  <button type="button" id="removeProjectBtn" style="background: #ef444422; border: 1px solid #ef4444; color: #ef4444; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; text-transform: uppercase; font-weight: bold; margin-left: 4px;" title="Remove Project from Registry">- Remove</button>
+                </div>
               </div>
               <select id="projectSelect">
                 <option value="shiptec-command-center">shiptec-command-center</option>

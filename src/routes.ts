@@ -13,6 +13,7 @@ import type { ExportFormat, TargetEditor } from "./types.js";
 import { generateProposal, listProposals, readProposal } from "./services/proposalService.js";
 // readProposal is used directly in the export route to enforce the Confidence Gate.
 import { exportProposal } from "./services/proposalExportService.js";
+import { removeProject } from "./projectStore.js";
 
 export const router = Router();
 
@@ -40,6 +41,49 @@ router.get("/projects", async (_request, response, next) => {
     next(error);
   }
 });
+
+// --- NEW SYNC ENDPOINT TO FORCE FULL WIZARD RESYNC & RESET ---
+router.get("/projects/:id/details", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    
+    try {
+      const intakeSpec = await readProjectArtifact(project, "Planning/intake_spec.json");
+      if (intakeSpec) {
+        const parsed = JSON.parse(intakeSpec);
+        return response.json({
+          id: project.id,
+          name: project.name,
+          folder: project.rootPath || "",
+          gitUrl: project.gitUrl || "",
+          intake: parsed
+        });
+      }
+    } catch (e) {
+      // If no file exists yet, gracefully fall back
+    }
+
+    response.json({
+      id: project.id,
+      name: project.name,
+      folder: project.rootPath || "",
+      gitUrl: project.gitUrl || "",
+      intake: project.intake
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/projects/:id", async (request, response, next) => {
+  try {
+    await removeProject(request.params.id);
+    response.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+// -------------------------------------------------------------
 
 router.get("/projects/:id/scan", async (request, response, next) => {
   try {

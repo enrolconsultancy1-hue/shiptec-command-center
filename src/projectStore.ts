@@ -55,3 +55,15 @@ export async function findProject(projectId: string): Promise<ProjectRecord | un
   const projects = await readProjects();
   return projects.find((project) => project.id === projectId);
 }
+
+export async function removeProject(projectId: string): Promise<void> {
+  if (useFirestoreBackend()) {
+    await firestore().collection("projects").doc(projectId).delete();
+    return;
+  }
+
+  await ensureRegistry();
+  const projects = await readProjects();
+  const next = projects.filter((item) => item.id !== projectId);
+  await writeFile(registryPath(), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+}
