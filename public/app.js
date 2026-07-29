@@ -1376,7 +1376,66 @@ async function exportHandoff() {
   }
 }
 async function commit() { showNotification("Commit: no repo action configured", "info", 3000); }
-async function newProject() { showNotification("New project picker not yet bound", "info", 3000); }
+
+async function newProject() {
+  const modal = document.getElementById("newProjectModal");
+  if (modal) modal.classList.add("active");
+}
+
+async function createNewProject() {
+  const nameInput = document.getElementById("newProjectName");
+  const rootPathInput = document.getElementById("newProjectRootPath");
+  const gitUrlInput = document.getElementById("newProjectGitUrl");
+  if (!nameInput || !nameInput.value.trim()) {
+    showNotification("Project name is required", "warning", 3000);
+    return;
+  }
+  const name = nameInput.value.trim();
+  const rootPath = rootPathInput ? rootPathInput.value.trim() : "";
+  const gitUrl = gitUrlInput ? gitUrlInput.value.trim() : "";
+  showLoading("Initializing project directory...");
+  try {
+    const payload = await request("/projects/init", {
+      method: "POST",
+      body: JSON.stringify({
+        rootPath: rootPath || undefined,
+        intake: {
+          projectName: name,
+          productSummary: name,
+          businessProblem: "To be defined",
+          targetUsers: ["To be defined"],
+          currentWorkflow: "To be defined",
+          desiredWorkflow: "To be defined",
+          successCriteria: ["To be defined"],
+          mvpDefinition: "To be defined",
+          toolsAndIntegrations: [],
+          technicalConstraints: [],
+          knownRisks: [],
+          openQuestions: [],
+          gitUrl: gitUrl || undefined
+        }
+      })
+    });
+    showNotification(`Project "${name}" created successfully`, "success", 3000);
+    log("Project created", payload);
+    const modal = document.getElementById("newProjectModal");
+    if (modal) modal.classList.remove("active");
+    nameInput.value = "";
+    if (rootPathInput) rootPathInput.value = "";
+    if (gitUrlInput) gitUrlInput.value = "";
+    await loadProjects();
+    if (payload.project) {
+      setActiveProject(payload.project.id);
+      await loadPipelineState();
+      await loadProposals(payload.project.id);
+    }
+  } catch (error) {
+    log("Create project failed", String(error));
+    showNotification("Failed to create project: " + String(error), "error", 0);
+  } finally {
+    hideLoading();
+  }
+}
 
 // ── Proposal Factory Button Handlers ──
 
@@ -1482,6 +1541,12 @@ async function exportProposalAction(format) {
 window.addEventListener("DOMContentLoaded", () => {
   checkHealth();
   loadProjects();
+
+  // ── New Project Button ──
+  const newProjectBtn = document.getElementById("newProjectBtn");
+  if (newProjectBtn) {
+    newProjectBtn.addEventListener("click", newProject);
+  }
 
   // ── Proposal Factory Button Wiring ──
   const generateBtn = document.getElementById("generateProposalBtn");
@@ -1607,4 +1672,29 @@ if (exportExecuteBtn) {
       hideLoading();
     }
   });
+}
+
+// ── New Project Modal Wiring ──
+const newProjectModal = document.getElementById("newProjectModal");
+const newProjectModalClose = document.getElementById("newProjectModalClose");
+const newProjectModalCancel = document.getElementById("newProjectModalCancel");
+const newProjectModalCreate = document.getElementById("newProjectModalCreate");
+
+if (newProjectModalClose) {
+  newProjectModalClose.addEventListener("click", () => {
+    if (newProjectModal) newProjectModal.classList.remove("active");
+  });
+}
+if (newProjectModalCancel) {
+  newProjectModalCancel.addEventListener("click", () => {
+    if (newProjectModal) newProjectModal.classList.remove("active");
+  });
+}
+if (newProjectModal) {
+  newProjectModal.addEventListener("click", (e) => {
+    if (e.target === newProjectModal) newProjectModal.classList.remove("active");
+  });
+}
+if (newProjectModalCreate) {
+  newProjectModalCreate.addEventListener("click", createNewProject);
 }
