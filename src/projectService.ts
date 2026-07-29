@@ -11,11 +11,11 @@ import { commitSprint, pushSprint, gitStatus, setupRemoteRepository } from "./gi
 import { calculateHealth } from "./health.js";
 import { useFirestoreBackend } from "./firebase.js";
 import {
-  acceptanceCriteriaTemplate,
+  acceptanceCriteriaTemplate_v2,
   acceptanceReportTemplate,
   architectPackTemplate,
-  builderDryRunTemplate,
-  currentStateTemplate,
+  builderDryRunTemplate_v2,
+  currentStateTemplate_v2,
   decisionsTemplate,
   handoffPromptTemplate,
   implementationLogTemplate,
@@ -27,7 +27,7 @@ import {
   sprintPlanTemplate,
   successCriteriaTemplate,
   systemToolsTemplate,
-  technicalBlueprintTemplate,
+  technicalBlueprintTemplate_v2,
   testReportTemplate,
   userRolesTemplate,
   architectureOverviewTemplate,
@@ -275,16 +275,16 @@ export async function provisionProjectFiles(project: ProjectRecord): Promise<voi
   const intake = project.intake;
   const files: Record<string, string> = {
     "Planning/Architect_Pack.md": architectPackTemplate(intake),
-    "Planning/Technical_Blueprint.md": technicalBlueprintTemplate(intake),
+    "Planning/Technical_Blueprint.md": technicalBlueprintTemplate_v2(intake),
     "Planning/Handoff_Prompt.md": handoffPromptTemplate(intake),
     "Planning/Validation_Report.md": reportMarkdown(validateIntake(intake)),
-    "Planning/Governance/Current_State.md": currentStateTemplate(intake),
+    "Planning/Governance/Current_State.md": currentStateTemplate_v2(intake),
     "Planning/Governance/Decisions.md": decisionsTemplate(),
     "Planning/Governance/Risks.md": risksTemplate(intake),
     "Planning/Governance/Open_Questions.md": openQuestionsTemplate(intake),
-    "Planning/Governance/Acceptance_Criteria.md": acceptanceCriteriaTemplate(intake),
+    "Planning/Governance/Acceptance_Criteria.md": acceptanceCriteriaTemplate_v2(intake),
     "Sprints/Sprint_001/Sprint_Plan.md": sprintPlanTemplate("Sprint_001"),
-    "Sprints/Sprint_001/Builder_Dry_Run.md": builderDryRunTemplate("Sprint_001"),
+    "Sprints/Sprint_001/Builder_Dry_Run.md": builderDryRunTemplate_v2("Sprint_001", intake),
     "Sprints/Sprint_001/Implementation_Log.md": implementationLogTemplate(),
     "Sprints/Sprint_001/Test_Report.md": testReportTemplate(),
     "Sprints/Sprint_001/Acceptance_Report.md": acceptanceReportTemplate(),
@@ -513,7 +513,7 @@ export async function createSprint(project: ProjectRecord, sprintNumber: number)
 
   const sprintId = `Sprint_${String(sprintNumber).padStart(3, "0")}`;
   await writeArtifactIfMissing(project, `Sprints/${sprintId}/Sprint_Plan.md`, sprintPlanTemplate(sprintId));
-  await writeArtifactIfMissing(project, `Sprints/${sprintId}/Builder_Dry_Run.md`, builderDryRunTemplate(sprintId));
+  await writeArtifactIfMissing(project, `Sprints/${sprintId}/Builder_Dry_Run.md`, builderDryRunTemplate_v2(sprintId, project.intake));
   await writeArtifactIfMissing(project, `Sprints/${sprintId}/Implementation_Log.md`, implementationLogTemplate());
   await writeArtifactIfMissing(project, `Sprints/${sprintId}/Test_Report.md`, testReportTemplate());
   await writeArtifactIfMissing(project, `Sprints/${sprintId}/Acceptance_Report.md`, acceptanceReportTemplate());

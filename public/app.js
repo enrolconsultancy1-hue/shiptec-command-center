@@ -573,6 +573,75 @@ async function loadSprints() {
   }
 }
 
+async function loadProposals(projectId) {
+  const proposalSelect = document.getElementById("proposalSelect");
+  const qualityContainer = document.getElementById("proposalQualityContainer");
+  const qualityGrid = document.getElementById("qualityGrid");
+  const overallScore = document.getElementById("proposalOverallScore");
+  const exportToolbar = document.getElementById("proposalExportToolbar");
+  if (!proposalSelect) return;
+  try {
+    const payload = await request(`/projects/${projectId}/proposals`);
+    const proposals = Array.isArray(payload.proposals) ? payload.proposals : [];
+    proposalSelect.innerHTML = "";
+    if (proposals.length === 0) {
+      proposalSelect.innerHTML = '<option value="">No proposals</option>';
+      if (qualityContainer) qualityContainer.style.display = "none";
+      if (exportToolbar) exportToolbar.style.display = "none";
+      return;
+    }
+    for (const p of proposals) {
+      const option = document.createElement("option");
+      option.value = p.id;
+      const date = p.createdAt ? new Date(p.createdAt).toLocaleString() : "";
+      option.textContent = p.version ? `Proposal v${p.version} - ${date}` : `${p.id} - ${date}`;
+      proposalSelect.append(option);
+    }
+    const latest = proposals[proposals.length - 1];
+    proposalSelect.value = latest.id;
+    if (latest.overallScore != null) {
+      if (overallScore) overallScore.textContent = latest.overallScore.toFixed(1);
+      if (qualityContainer) qualityContainer.style.display = "block";
+      if (qualityGrid) {
+        try {
+          const detail = await request(`/projects/${projectId}/proposals/${latest.id}`);
+          renderQaGauges(detail.proposal.quality, qualityGrid);
+        } catch { /* non-blocking */ }
+      }
+    } else {
+      if (qualityContainer) qualityContainer.style.display = "none";
+    }
+    if (exportToolbar) exportToolbar.style.display = "flex";
+  } catch (error) {
+    log("Failed to load proposals", String(error));
+    proposalSelect.innerHTML = '<option value="">No proposals</option>';
+  }
+}
+
+function renderQaGauges(quality, gridEl) {
+  if (!quality || !gridEl) return;
+  const dims = Array.isArray(quality.dimensions) ? quality.dimensions : [];
+  gridEl.innerHTML = "";
+  if (dims.length === 0) {
+    gridEl.innerHTML = '<span style="grid-column:1/-1;color:#94a3b8;font-size:10px;">No quality dimensions available</span>';
+    return;
+  }
+  for (const d of dims) {
+    const pct = Math.round((d.score / d.maxScore) * 100);
+    const hue = pct >= 80 ? 142 : pct >= 50 ? 38 : 0;
+    const card = document.createElement("div");
+    card.style.cssText = "background:rgba(255,255,255,0.03);border-radius:4px;padding:4px;text-align:center;";
+    card.innerHTML = `
+      <div style="font-size:9px;color:#94a3b8;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.label}">${d.label}</div>
+      <div style="position:relative;width:100%;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:hsl(${hue},70%,50%);border-radius:2px;transition:width .4s;"></div>
+      </div>
+      <div style="font-size:9px;font-weight:bold;color:hsl(${hue},70%,60%);margin-top:2px;">${d.score.toFixed(1)}</div>
+    `;
+    gridEl.append(card);
+  }
+}
+
 async function loadProjects() {
   showLoading("Loading projects...");
   try {
@@ -595,7 +664,7 @@ async function loadProjects() {
       populateIntakeForm(activeProject.intake);
       updateArtifactSelectOptions();
       await loadSprints();
-      if (typeof loadProposals === 'function') await loadProposals();
+      await loadProposals(activeProjectId);
       await scan();
       await git();
       await getGitHubStatus();
@@ -1032,6 +1101,7 @@ if (projectSelect) {
       await git();
       await getGitHubStatus();
       await loadSprints();
+      await loadProposals(selectedId);
       await loadPipelineState();
       
       showNotification(`Switched context to ${selectedId}`, "success", 3000);
@@ -1248,11 +1318,293 @@ async function authorizeUrls() {
 
 // ── Placeholder actions for unbound data-action buttons ──
 async function openRefineModal() { showNotification("Refine: select an artifact first", "info", 3000); }
-async function exportHandoff() { showNotification("Export handoffs via the Export button", "info", 3000); }
+// ── Export Handoff Action ──
+async function exportHandoff() {
+  const exportBtn = document.querySelector('[data-action="exportHandoff"]');
+  if (exportBtn) {
+    exportBtn.disabled = true;
+    exportBtn.textContent = "Exporting Package...";
+    exportBtn.classList.remove("btn-success", "btn-danger");
+  }
+  showLoading("Exporting handoff package...");
+  try {
+    const payload = await request(`/projects/${activeProjectId}/handoff/export`, {
+      method: "POST",
+      body: JSON.stringify({ format: "zip", editor: selectedEditor })
+    });
+    if (payload.zipBuffer) {
+      const byteChars = atob(payload.zipBuffer);
+      const byteNums = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNums[i] = byteChars.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNums);
+      const blob = new Blob([byteArray], { type: "application/zip" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${activeProjectId}-handoff-${selectedEditor}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+    if (exportBtn) {
+      exportBtn.textContent = "Export Complete \u2713";
+      exportBtn.classList.add("btn-success");
+    }
+    showNotification("Handoff package exported successfully", "success", 3000);
+    log("Handoff export", payload);
+  } catch (error) {
+    if (exportBtn) {
+      exportBtn.textContent = "Export Failed \u2717";
+      exportBtn.classList.add("btn-danger");
+    }
+    showNotification("Handoff export failed: " + String(error), "error", 0);
+    log("Handoff export failed", String(error));
+  } finally {
+    if (exportBtn) {
+      exportBtn.disabled = false;
+      setTimeout(() => {
+        if (exportBtn) {
+          exportBtn.textContent = "Export Handoff Package";
+          exportBtn.classList.remove("btn-success", "btn-danger");
+        }
+      }, 3000);
+    }
+    hideLoading();
+  }
+}
 async function commit() { showNotification("Commit: no repo action configured", "info", 3000); }
 async function newProject() { showNotification("New project picker not yet bound", "info", 3000); }
+
+// ── Proposal Factory Button Handlers ──
+
+async function generateProposal() {
+  if (!activeProjectId) return;
+  showLoading("Generating Proposal from Architect Intelligence...");
+  try {
+    const payload = await request(`/projects/${activeProjectId}/proposals/generate`, { method: "POST" });
+    showNotification("Proposal generated successfully", "success", 3000);
+    log("Proposal generated", payload);
+    await loadProposals(activeProjectId);
+    const proposal = payload.proposal;
+    if (proposal && proposal.quality) {
+      const qualityGrid = document.getElementById("qualityGrid");
+      const overallScore = document.getElementById("proposalOverallScore");
+      if (overallScore) overallScore.textContent = proposal.quality.overallScore.toFixed(1);
+      if (qualityGrid) renderQaGauges(proposal.quality, qualityGrid);
+      document.getElementById("proposalQualityContainer").style.display = "block";
+      document.getElementById("proposalExportToolbar").style.display = "flex";
+    }
+  } catch (error) {
+    log("Generate proposal failed", String(error));
+    showNotification("Proposal generation failed: " + String(error), "error", 0);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function viewProposal() {
+  const proposalSelect = document.getElementById("proposalSelect");
+  const qualityGrid = document.getElementById("qualityGrid");
+  const overallScore = document.getElementById("proposalOverallScore");
+  if (!proposalSelect || !proposalSelect.value) return;
+  const proposalId = proposalSelect.value;
+  showLoading(`Loading proposal ${proposalId}...`);
+  try {
+    const payload = await request(`/projects/${activeProjectId}/proposals/${proposalId}`);
+    const proposal = payload.proposal;
+    if (proposal.fullMarkdown && artifactView) {
+      artifactView.value = proposal.fullMarkdown;
+      artifactView.readOnly = true;
+    }
+    if (proposal.quality) {
+      if (overallScore) overallScore.textContent = proposal.quality.overallScore.toFixed(1);
+      if (qualityGrid) renderQaGauges(proposal.quality, qualityGrid);
+      document.getElementById("proposalQualityContainer").style.display = "block";
+    }
+    if (proposal.quality && proposal.quality.dimensions && proposal.quality.dimensions.length > 0) {
+      document.getElementById("proposalExportToolbar").style.display = "flex";
+    }
+    showNotification(`Loaded proposal ${proposalId}`, "success", 3000);
+    log("View proposal", payload);
+  } catch (error) {
+    log("View proposal failed", String(error));
+    showNotification("Failed to load proposal: " + String(error), "error", 0);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function exportProposalAction(format) {
+  const proposalSelect = document.getElementById("proposalSelect");
+  if (!proposalSelect || !proposalSelect.value) {
+    showNotification("Select a proposal first", "warning", 3000);
+    return;
+  }
+  const proposalId = proposalSelect.value;
+  showLoading(`Exporting proposal as ${format.toUpperCase()}...`);
+  try {
+    const payload = await request(`/projects/${activeProjectId}/proposals/${proposalId}/export`, {
+      method: "POST",
+      body: JSON.stringify({ format, options: { force: true } })
+    });
+    if (payload.url) {
+      window.open(payload.url, "_blank");
+      showNotification(`Proposal exported — opened ${payload.filename || format}`, "success", 3000);
+    } else if (payload.buffer) {
+      const byteChars = atob(payload.buffer);
+      const byteNums = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([new Uint8Array(byteNums)], { type: payload.mimeType || "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = payload.filename || `${proposalId}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showNotification(`Downloaded ${a.download}`, "success", 3000);
+    } else {
+      showNotification(`Proposal exported as ${format}`, "success", 3000);
+    }
+    log("Proposal export", payload);
+  } catch (error) {
+    log("Export proposal failed", String(error));
+    showNotification("Export failed: " + String(error), "error", 0);
+  } finally {
+    hideLoading();
+  }
+}
 
 window.addEventListener("DOMContentLoaded", () => {
   checkHealth();
   loadProjects();
+
+  // ── Proposal Factory Button Wiring ──
+  const generateBtn = document.getElementById("generateProposalBtn");
+  if (generateBtn) {
+    generateBtn.addEventListener("click", generateProposal);
+  }
+
+  const viewBtn = document.getElementById("viewProposalBtn");
+  if (viewBtn) {
+    viewBtn.addEventListener("click", viewProposal);
+  }
+
+  document.querySelectorAll(".export-btn[data-format]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const format = btn.dataset.format;
+      if (format) exportProposalAction(format);
+    });
+  });
 });
+
+// ── Export Modal Wiring ──
+const exportModalOverlay = document.getElementById("exportModalOverlay");
+const exportModalClose = document.getElementById("exportModalClose");
+const exportCancelBtn = document.getElementById("exportCancelBtn");
+const exportExecuteBtn = document.getElementById("exportExecuteBtn");
+
+if (exportModalClose) {
+  exportModalClose.addEventListener("click", () => {
+    if (exportModalOverlay) exportModalOverlay.classList.remove("active");
+  });
+}
+if (exportCancelBtn) {
+  exportCancelBtn.addEventListener("click", () => {
+    if (exportModalOverlay) exportModalOverlay.classList.remove("active");
+  });
+}
+if (exportModalOverlay) {
+  exportModalOverlay.addEventListener("click", (e) => {
+    if (e.target === exportModalOverlay) exportModalOverlay.classList.remove("active");
+  });
+}
+
+// Format/editor card selection in modal
+document.querySelectorAll(".export-card").forEach(card => {
+  card.addEventListener("click", () => {
+    card.closest(".export-format-grid")?.querySelectorAll(".export-card").forEach(c => c.classList.remove("selected"));
+    card.classList.add("selected");
+    const radio = card.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+    const destSection = document.getElementById("exportDestSection");
+    if (destSection) {
+      destSection.style.display = card.dataset.format === "folder" ? "block" : "none";
+    }
+  });
+});
+
+document.querySelectorAll(".export-editor-grid .editor-card").forEach(card => {
+  card.addEventListener("click", () => {
+    card.closest(".export-editor-grid")?.querySelectorAll(".editor-card").forEach(c => c.classList.remove("selected"));
+    card.classList.add("selected");
+    const radio = card.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+  });
+});
+
+// Modal execute handler — wraps the same export logic
+if (exportExecuteBtn) {
+  exportExecuteBtn.addEventListener("click", async () => {
+    const formatRadio = document.querySelector('input[name="exportFormat"]:checked');
+    const editorRadio = document.querySelector('input[name="targetEditor"]:checked');
+    const format = formatRadio ? formatRadio.value : "zip";
+    const editor = editorRadio ? editorRadio.value : selectedEditor;
+    const destPathInput = document.getElementById("exportDestPath");
+    const destPath = destPathInput ? destPathInput.value : undefined;
+
+    exportExecuteBtn.disabled = true;
+    const btnText = exportExecuteBtn.querySelector(".export-btn-text");
+    const btnIcon = exportExecuteBtn.querySelector(".export-btn-icon");
+    if (btnText) btnText.textContent = "Exporting...";
+    if (btnIcon) btnIcon.textContent = "\u23F3";
+    showLoading("Exporting handoff package...");
+
+    try {
+      const body = { format, editor };
+      if (format === "folder" && destPath) body.destinationPath = destPath;
+
+      const payload = await request(`/projects/${activeProjectId}/handoff/export`, {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+
+      if (format === "zip" && payload.zipBuffer) {
+        const byteChars = atob(payload.zipBuffer);
+        const byteNums = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([new Uint8Array(byteNums)], { type: "application/zip" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${activeProjectId}-handoff-${editor}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      if (btnText) btnText.textContent = "Exported \u2713";
+      exportExecuteBtn.style.background = "#27ae60";
+      showNotification(`Handoff exported as ${format} for ${editor}`, "success", 3000);
+      log("Modal handoff export", payload);
+    } catch (error) {
+      if (btnText) btnText.textContent = "Failed \u2717";
+      exportExecuteBtn.style.background = "#e74c3c";
+      showNotification("Export failed: " + String(error), "error", 0);
+      log("Modal handoff export failed", String(error));
+    } finally {
+      exportExecuteBtn.disabled = false;
+      setTimeout(() => {
+        if (btnText) btnText.textContent = "Export Package";
+        if (btnIcon) btnIcon.textContent = "\u26A1";
+        exportExecuteBtn.style.background = "";
+      }, 3000);
+      hideLoading();
+    }
+  });
+}

@@ -1442,6 +1442,38 @@ aside.panel {
   100% { transform: translateX(100%); }
 }
 
+/* Export button state overrides */
+.actions button.btn-success {
+  background: #27ae60 !important;
+  color: #fff !important;
+  border-color: #27ae60 !important;
+  box-shadow: 0 0 16px rgba(39, 174, 96, 0.4) !important;
+  animation: none !important;
+}
+
+.actions button.btn-danger {
+  background: #e74c3c !important;
+  color: #fff !important;
+  border-color: #e74c3c !important;
+  box-shadow: 0 0 16px rgba(231, 76, 60, 0.4) !important;
+  animation: none !important;
+}
+
+.actions button.btn-success:hover,
+.actions button.btn-danger:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+  transform: translateY(-1px);
+}
+
+.actions button.btn-success:hover::before,
+.actions button.btn-danger:hover::before {
+  content: "Re-export?";
+  display: inline;
+}
+
 /* ─── Export Modal Overlay ─────────────────────────────── */
 .export-modal-overlay {
   position: fixed;
