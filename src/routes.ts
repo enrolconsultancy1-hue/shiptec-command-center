@@ -310,9 +310,31 @@ router.post("/projects/:id/authorize-urls", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
     const result = await authorizeUrls(project);
-    response.json({ ...result, message: "URL Authorization scan complete. Library updated." });
+    const urls = [
+      ...(project.intake.skillsUrl || []),
+      ...(project.intake.knowledgeUrl || []),
+    ].filter(Boolean);
+    const scanUrl = urls[0] || "";
+    response.json({
+      success: true,
+      passed: result.flagged.length === 0,
+      score: result.flagged.length > 0 ? result.flagged.length * 10 : 0,
+      url: scanUrl,
+      findings: result.flagged,
+      authorized: result.authorized,
+      flagged: result.flagged,
+      cliAvailable: result.cliAvailable,
+      cliVersion: result.cliVersion,
+      message: `URL Authorization scan complete. ${result.authorized.length} authorized, ${result.flagged.length} flagged.`
+    });
   } catch (error) {
-    next(error);
+    response.status(500).json({
+      success: false,
+      passed: false,
+      url: "",
+      findings: [error instanceof Error ? error.message : "Authorization scan failed"],
+      message: "URL Authorization scan encountered an error."
+    });
   }
 });
 

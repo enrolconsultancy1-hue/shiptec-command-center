@@ -621,21 +621,24 @@ async function scan() {
       updateSubmitButton(payload.projectStatus.status, payload.projectStatus.statusUpdatedAt);
     }
     
-    // Update Dynamic Authorization Button State
+    // Update Dynamic Authorization Button State from scan
     const authBtn = document.querySelector('[data-action="authorizeUrls"]');
     if (authBtn && payload.scan.authStatus) {
       if (payload.scan.authStatus === "authorized") {
-        authBtn.innerHTML = "✅ URLs Authorized";
+        authBtn.innerHTML = "Filter URL \u2713";
         authBtn.style.background = "#00ffcc";
         authBtn.style.color = "#000";
+        authBtn.title = "URLs already authorized. Click to re-scan.";
       } else if (payload.scan.authStatus === "rejected") {
-        authBtn.innerHTML = "🚩 URLs Rejected";
+        authBtn.innerHTML = "Filter URL \u2717";
         authBtn.style.background = "#ff4d4d";
         authBtn.style.color = "#fff";
+        authBtn.title = "Previously flagged URLs found. Click to re-scan.";
       } else {
-        authBtn.innerHTML = "🛡️ Authorize URLs";
+        authBtn.innerHTML = "Filter URL";
         authBtn.style.background = "";
         authBtn.style.color = "";
+        authBtn.title = "Scan open-source URLs for security risks";
       }
     }
 
@@ -1190,7 +1193,60 @@ if (commandPanel) {
   });
 }
 
-// ── Refine modal (placeholder, wired if relevant DOM exists) ──
+// ── SkillSpector URL Scan Action ──
+async function authorizeUrls() {
+  const authBtn = document.querySelector('[data-action="authorizeUrls"]');
+  // Set loading state
+  if (authBtn) {
+    authBtn.disabled = true;
+    authBtn.innerHTML = "Filtering...";
+    authBtn.style.background = "#555";
+    authBtn.style.color = "#aaa";
+  }
+  try {
+    const payload = await request(`/projects/${activeProjectId}/authorize-urls`, { method: "POST" });
+    if (authBtn) {
+      if (payload.passed) {
+        authBtn.innerHTML = "URL Passed \u2713";
+        authBtn.style.background = "#27ae60";
+        authBtn.style.color = "#fff";
+        authBtn.title = "All URLs passed SkillSpector security scan.";
+        authBtn.classList.add("btn-success");
+        authBtn.classList.remove("btn-danger");
+      } else {
+        authBtn.innerHTML = "URL Failed \u2717";
+        authBtn.style.background = "#e74c3c";
+        authBtn.style.color = "#fff";
+        authBtn.title = "Flagged URLs found. Check report for details.";
+        authBtn.classList.add("btn-danger");
+        authBtn.classList.remove("btn-success");
+      }
+    }
+    if (payload.flagged && payload.flagged.length > 0) {
+      showNotification(`SkillSpector flagged ${payload.flagged.length} URL(s)`, "warning", 5000);
+    } else if (payload.passed) {
+      showNotification("All URLs passed SkillSpector security scan", "success", 3000);
+    }
+    log("URL Authorization", payload);
+  } catch (error) {
+    if (authBtn) {
+      authBtn.innerHTML = "URL Failed \u2717";
+      authBtn.style.background = "#e74c3c";
+      authBtn.style.color = "#fff";
+      authBtn.title = "Authorization scan failed.";
+      authBtn.classList.add("btn-danger");
+      authBtn.classList.remove("btn-success");
+    }
+    showNotification("URL Authorization failed: " + String(error), "error", 0);
+    log("URL Authorization failed", String(error));
+  } finally {
+    if (authBtn) {
+      authBtn.disabled = false;
+    }
+  }
+}
+
+// ── Placeholder actions for unbound data-action buttons ──
 async function openRefineModal() { showNotification("Refine: select an artifact first", "info", 3000); }
 async function exportHandoff() { showNotification("Export handoffs via the Export button", "info", 3000); }
 async function commit() { showNotification("Commit: no repo action configured", "info", 3000); }

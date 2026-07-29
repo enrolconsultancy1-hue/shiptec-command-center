@@ -2433,3 +2433,27 @@ aside.panel {
   }
 }
 
+
+/* --- SkillSpector Button States ----------------------------------------- */
+.actions button.btn-success {
+  background: #27ae60 !important;
+  border-color: #27ae60 !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(39, 174, 96, 0.4) !important;
+}
+.actions button.btn-danger {
+  background: #e74c3c !important;
+  border-color: #e74c3c !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(231, 76, 60, 0.4) !important;
+}
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+.actions button:disabled:hover {
+  box-shadow: none !important;
+  border-color: var(--border-color) !important;
+  color: #aaa !important;
+}

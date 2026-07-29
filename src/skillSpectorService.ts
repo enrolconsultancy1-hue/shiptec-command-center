@@ -1,4 +1,4 @@
-import { exec } from "node:child_process";
+import { exec, execSync } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -6,6 +6,52 @@ import { ProjectRecord } from "./types.js";
 import { writeArtifact } from "./artifactStore.js";
 
 const execPromise = promisify(exec);
+
+let _cliAvailable: boolean | null = null;
+
+export interface AuthorizeUrlsResponse {
+  success: boolean;
+  passed: boolean;
+  url: string;
+  findings: string[];
+  score: number;
+  authorized: string[];
+  flagged: string[];
+  message: string;
+}
+
+/**
+ * Check whether the SkillSpector CLI (`skillspector`) is available on PATH.
+ * Caches the result so repeated calls don't recheck.
+ * Returns `{ available: boolean, version?: string, error?: string }`.
+ */
+export function ensureSkillSpectorInstalled(): { available: boolean; version?: string; error?: string } {
+  if (_cliAvailable === true) {
+    return { available: true, version: "(cached)" };
+  }
+  try {
+    const version = execSync("skillspector --version", { encoding: "utf8", timeout: 10000 }).trim();
+    _cliAvailable = true;
+    return { available: true, version };
+  } catch (checkErr: any) {
+    const errMsg = checkErr?.stderr || checkErr?.message || String(checkErr);
+    // Attempt auto-install via uv
+    try {
+      execSync(
+        `uv tool install git+https://github.com/NVIDIA/skillspector.git`,
+        { encoding: "utf8", timeout: 60000, stdio: "pipe" }
+      );
+      const version = execSync("skillspector --version", { encoding: "utf8", timeout: 10000 }).trim();
+      _cliAvailable = true;
+      return { available: true, version: `auto-installed: ${version}` };
+    } catch (installErr: any) {
+      const installMsg = installErr?.stderr || installErr?.message || String(installErr);
+      _cliAvailable = false;
+      console.warn(`[skillspector] CLI not found and auto-install failed: ${installMsg}`);
+      return { available: false, error: `SkillSpector CLI is not installed and auto-install failed: ${installMsg}` };
+    }
+  }
+}
 
 interface ScanResult {
   url: string;
@@ -19,7 +65,10 @@ export async function authorizeUrls(project: ProjectRecord): Promise<{
   authorized: string[];
   flagged: string[];
   report: string;
+  cliAvailable: boolean;
+  cliVersion?: string;
 }> {
+  const cliStatus = ensureSkillSpectorInstalled();
   const urls = [
     ...(project.intake.skillsUrl || []),
     ...(project.intake.knowledgeUrl || []),
@@ -29,7 +78,7 @@ export async function authorizeUrls(project: ProjectRecord): Promise<{
   const results: ScanResult[] = [];
 
   for (const url of uniqueUrls) {
-    const result = await scanUrl(url);
+    const result = await scanUrl(url, cliStatus.available);
     results.push(result);
   }
 
@@ -50,15 +99,14 @@ export async function authorizeUrls(project: ProjectRecord): Promise<{
   const report = generateAuthorizationReport(project.name, results);
   await writeArtifact(project, "Docs/Legal/Authorized_URL_Library.md", report);
 
-  return { authorized, flagged, report };
+  return { authorized, flagged, report, cliAvailable: cliStatus.available, cliVersion: cliStatus.version };
 }
 
-async function scanUrl(url: string): Promise<ScanResult> {
+async function scanUrl(url: string, cliAvailable: boolean): Promise<ScanResult> {
   let stdoutStr = "";
   try {
-    // Attempt to use the actual SkillSpector CLI if available
-    // We use a timeout and a fallback to ensure zero-error stability
-    const { stdout } = await execPromise(`skillspector scan "${url}" --format json --no-llm`, { timeout: 30000 });
+    if (!cliAvailable) { throw new Error("CLI not available"); }
+    const { stdout } = await execPromise(`skillspector scan --url "${url}" --format json --no-llm`, { timeout: 45000 });
     stdoutStr = stdout;
   } catch (error: any) {
     // If the command exited with non-zero exit code due to finding issues, stdout is in error.stdout
