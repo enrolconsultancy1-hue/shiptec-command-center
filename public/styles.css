@@ -2253,3 +2253,183 @@ aside.panel {
   display: none;
 }
 
+
+/* --- Pipeline Progress Bar --------------------------------------------- */
+
+.pipeline-panel {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 12px;
+}
+
+.pipeline-panel .panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.pipeline-panel .panel-head h2 {
+  font-size: 13px;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.pipeline-panel .panel-head span {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pipeline-steps {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  transition: all 0.25s ease;
+  cursor: default;
+  min-height: 48px;
+  justify-content: center;
+  position: relative;
+}
+
+.pipeline-step .step-number {
+  font-size: 16px;
+  font-weight: 700;
+  display: block;
+}
+
+.pipeline-step .step-label {
+  font-size: 9px;
+  display: block;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Completed */
+.pipeline-step.pipeline-completed {
+  background: rgba(39, 174, 96, 0.12);
+  border-color: #27ae60;
+  color: #27ae60;
+  box-shadow: 0 0 8px rgba(39, 174, 96, 0.3);
+}
+
+.pipeline-step.pipeline-completed::after {
+  content: '?';
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: #27ae60;
+}
+
+/* Running */
+.pipeline-step.pipeline-running {
+  background: rgba(0, 128, 255, 0.12);
+  border-color: #0080ff;
+  color: #0080ff;
+  box-shadow: 0 0 8px rgba(0, 128, 255, 0.3);
+  animation: pipelinePulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pipelinePulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 128, 255, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(0, 128, 255, 0.6); }
+}
+
+/* Failed */
+.pipeline-step.pipeline-failed {
+  background: rgba(231, 76, 60, 0.12);
+  border-color: #e74c3c;
+  color: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.3);
+}
+
+.pipeline-step.pipeline-failed::after {
+  content: '?';
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: #e74c3c;
+}
+
+/* Blocked (dependency not met) */
+.pipeline-step.pipeline-blocked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Current active step */
+.pipeline-step.pipeline-active {
+  background: rgba(0, 128, 255, 0.08);
+  border-color: #0080ff;
+  color: var(--primary-color);
+}
+
+/* Legend */
+.pipeline-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.pipeline-legend .legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.pipeline-completed { background: #27ae60; }
+.pipeline-running { background: #0080ff; animation: pipelinePulse 1.5s infinite ease-in-out; }
+.pipeline-failed { background: #e74c3c; }
+.pipeline-idle { background: var(--border-color); }
+
+@media (max-width: 900px) {
+  .pipeline-steps {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .pipeline-step {
+    min-height: 40px;
+    padding: 4px 2px;
+  }
+  .pipeline-step .step-number {
+    font-size: 13px;
+  }
+  .pipeline-step .step-label {
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 600px) {
+  .pipeline-steps {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+

@@ -3,13 +3,14 @@ import { z } from "zod";
 import { badRequest, conflict } from "./errors.js";
 import { calculateHealth } from "./health.js";
 import { ensureGitRepository, githubConfigStatus, gitStatus } from "./gitService.js";
-import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, getProjectTree, initializeProject, listProjects, listSprints, previewArtifactUpdate, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateProjectStatus, updateValidationReport, validateDryRun, validateProject } from "./projectService.js";
+import { acceptSprint, createGitHubRepository, createSprint, generateBuilderSpecification, getProject, getProjectTree, initializeProject, listProjects, listSprints, previewArtifactUpdate, provisionProjectFiles, readProjectArtifact, readSprint, researchPatterns, scanProject, syncTestReportFromLog, updateCurrentState, updateProjectArtifact, updateProjectStatus, updateValidationReport, validateDryRun, validateProject } from "./projectService.js";
 import { authorizeUrls } from "./skillSpectorService.js";
 import { applyBuilderSpecification } from "./builderService.js";
 import { createHandoffPackage, exportHandoffPackage } from "./handoffService.js";
 import { refineArtifact } from "./refinementService.js";
 import { validateIntake } from "./validation.js";
-import type { ExportFormat, TargetEditor } from "./types.js";
+import type { ExportFormat, TargetEditor, PipelineProgress } from "./types.js";
+import { WorkflowStep } from "./types/pipeline.js";
 import { generateProposal, listProposals, readProposal } from "./services/proposalService.js";
 // readProposal is used directly in the export route to enforce the Confidence Gate.
 import { exportProposal } from "./services/proposalExportService.js";
@@ -23,6 +24,33 @@ const sprintBodySchema = z.object({
 
 router.get("/health", (_request, response) => {
   response.json({ ok: true, service: "shiptec-command-center" });
+});
+
+router.get("/projects/:id/pipeline", async (request, response, next) => {
+  try {
+    const project = await getProject(request.params.id);
+    const progress = project.pipelineProgress ?? {
+      currentStep: WorkflowStep.INTAKE_INIT,
+      stepStatuses: {
+        [WorkflowStep.INTAKE_INIT]: "idle",
+        [WorkflowStep.PRODUCT_DEF]: "idle",
+        [WorkflowStep.SCAN]: "idle",
+        [WorkflowStep.VALIDATE]: "idle",
+        [WorkflowStep.ARCHITECT_PACK]: "idle",
+        [WorkflowStep.BUILDER_SPEC]: "idle",
+        [WorkflowStep.SPRINT_CREATE]: "idle",
+        [WorkflowStep.BUILDER_DRY_RUN]: "idle",
+        [WorkflowStep.DRY_RUN_VALIDATE]: "idle",
+        [WorkflowStep.PATTERN_RESEARCH]: "idle",
+        [WorkflowStep.BUILDER_EXECUTE]: "idle",
+        [WorkflowStep.ACCEPTANCE]: "idle",
+        [WorkflowStep.EXPORT_DELIVERY]: "idle"
+      }
+    };
+    response.json({ pipeline: progress });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post("/projects/init", async (request, response, next) => {
@@ -186,7 +214,31 @@ router.get("/projects/:id/graph", async (request, response, next) => {
 router.post("/projects/:id/architect-pack", async (request, response, next) => {
   try {
     const project = await getProject(request.params.id);
-    response.json({ project, message: "Architect Pack is generated during initialization and preserved unless missing." });
+    await provisionProjectFiles(project);
+    const manifest = [
+      "Planning/Architect_Pack.md",
+      "Planning/Technical_Blueprint.md",
+      "Planning/Handoff_Prompt.md",
+      "Planning/Validation_Report.md",
+      "Planning/Governance/Current_State.md",
+      "Planning/Governance/Decisions.md",
+      "Planning/Governance/Risks.md",
+      "Planning/Governance/Open_Questions.md",
+      "Planning/Governance/Acceptance_Criteria.md",
+      "Sprints/Sprint_001/Sprint_Plan.md",
+      "Sprints/Sprint_001/Builder_Dry_Run.md",
+      "Sprints/Sprint_001/Implementation_Log.md",
+      "Sprints/Sprint_001/Test_Report.md",
+      "Sprints/Sprint_001/Acceptance_Report.md",
+      "Docs/Product_Requirements.md"
+    ];
+    response.json({
+      project,
+      status: "provisioned",
+      manifest,
+      generatedAt: new Date().toISOString(),
+      message: "Architect Pack provisioned successfully."
+    });
   } catch (error) {
     next(error);
   }
@@ -362,7 +414,8 @@ router.post("/projects/:id/builder-dry-run", async (request, response, next) => 
     const project = await getProject(request.params.id);
     const body = sprintBodySchema.parse(request.body ?? {});
     const sprint = await createSprint(project, body.sprintNumber);
-    response.status(201).json({ sprint });
+    const validation = await validateDryRun(project, sprint.sprintId);
+    response.status(201).json({ sprint, validation, message: "Builder dry run completed." });
   } catch (error) {
     next(error);
   }

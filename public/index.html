@@ -158,13 +158,42 @@
             <button type="button" data-action="generateSpecification">Generate Spec</button>
             <button type="button" data-action="applySpec">Apply Spec</button>
             <button type="button" data-action="createHandoff">Create Handoff</button>
-            <button type="button" data-action="exportHandoff" class="btn-export">📦 Export Handoff</button>
+            <button type="button" data-action="exportHandoff" class="btn-export">dY"� Export Handoff</button>
             <button type="button" data-action="dryRun">Dry Run</button>
-            <button type="button" data-action="authorizeUrls">🛡️ Authorize URLs</button>
+            <button type="button" data-action="authorizeUrls">dY>��,? Authorize URLs</button>
             <button type="button" data-action="git">Git Status</button>
             <button type="button" data-action="accept">Accept</button>
             <button type="button" data-action="commit">Commit</button>
             <button type="button" data-action="githubSetup">GitHub Setup</button>
+          </div>
+
+          <!-- 13-Step Pipeline Progress -->
+          <div class="pipeline-panel" id="pipelinePanel">
+            <div class="panel-head">
+              <h2>Pipeline Progress</h2>
+              <span id="pipelineStatus">13 Steps</span>
+            </div>
+            <div class="pipeline-steps" id="pipelineSteps">
+              <div class="pipeline-step pipeline-idle" data-step="1">1: Intake</div>
+              <div class="pipeline-step pipeline-idle" data-step="2">2: Product</div>
+              <div class="pipeline-step pipeline-idle" data-step="3">3: Scan</div>
+              <div class="pipeline-step pipeline-idle" data-step="4">4: Validate</div>
+              <div class="pipeline-step pipeline-idle" data-step="5">5: Architect</div>
+              <div class="pipeline-step pipeline-idle" data-step="6">6: Spec</div>
+              <div class="pipeline-step pipeline-idle" data-step="7">7: Sprint</div>
+              <div class="pipeline-step pipeline-idle" data-step="8">8: Dry Run</div>
+              <div class="pipeline-step pipeline-idle" data-step="9">9: V&auml;lidate</div>
+              <div class="pipeline-step pipeline-idle" data-step="10">10: Research</div>
+              <div class="pipeline-step pipeline-idle" data-step="11">11: Execute</div>
+              <div class="pipeline-step pipeline-idle" data-step="12">12: Accept</div>
+              <div class="pipeline-step pipeline-idle" data-step="13">13: Export</div>
+            </div>
+            <div class="pipeline-legend">
+              <span class="legend-dot pipeline-completed"></span> Completed
+              <span class="legend-dot pipeline-running"></span> Running
+              <span class="legend-dot pipeline-failed"></span> Failed
+              <span class="legend-dot pipeline-idle"></span> Pending
+            </div>
           </div>
 
           <!-- Export Handoff Modal -->

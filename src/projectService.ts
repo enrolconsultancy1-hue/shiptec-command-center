@@ -98,9 +98,16 @@ export async function generateBuilderSpecification(project: ProjectRecord): Prom
   let nextTask = "No next task defined.";
   try {
     const fs = await import("node:fs/promises");
-    nextTask = await fs.readFile(path.join("C:\\Users\\hp\\projects\\Shitec", "NEXT_TASK.md"), "utf8");
+    const workspaceRoot = process.env.PROJECT_ROOT || path.resolve(process.cwd());
+    nextTask = await fs.readFile(path.join(workspaceRoot, "NEXT_TASK.md"), "utf8");
   } catch {
-    // Fallback to local next task if workspace level is missing
+    // Fallback to project root if workspace level is missing
+    try {
+      const fs = await import("node:fs/promises");
+      nextTask = await fs.readFile(path.join(project.rootPath, "NEXT_TASK.md"), "utf8");
+    } catch {
+      // Fallback
+    }
   }
 
   // Get Repository Snapshot & Git Metadata

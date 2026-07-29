@@ -101,7 +101,8 @@ if (removeProjectBtn) {
 
 let activeProjectId = "shiptec-command-center";
 let activeSprintId = "Sprint_001";
-let selectedEditor = "antigravity"; 
+let selectedEditor = "antigravity";
+let pipelineState = null;
 
 function selectEditor(editor) {
   selectedEditor = editor;
@@ -109,6 +110,98 @@ function selectEditor(editor) {
     card.classList.toggle('active', card.dataset.editor === editor);
   });
   showNotification(`Target editor set to ${editor}`, "info", 1000);
+}
+
+const WORKFLOW_STEPS = [
+  { num: 1, key: "INTAKE_INIT", label: "Intake" },
+  { num: 2, key: "PRODUCT_DEF", label: "Product" },
+  { num: 3, key: "SCAN", label: "Scan" },
+  { num: 4, key: "VALIDATE", label: "Validate" },
+  { num: 5, key: "ARCHITECT_PACK", label: "Architect" },
+  { num: 6, key: "BUILDER_SPEC", label: "Spec" },
+  { num: 7, key: "SPRINT_CREATE", label: "Sprint" },
+  { num: 8, key: "BUILDER_DRY_RUN", label: "Dry Run" },
+  { num: 9, key: "DRY_RUN_VALIDATE", label: "V&auml;lidate" },
+  { num: 10, key: "PATTERN_RESEARCH", label: "Research" },
+  { num: 11, key: "BUILDER_EXECUTE", label: "Execute" },
+  { num: 12, key: "ACCEPTANCE", label: "Accept" },
+  { num: 13, key: "EXPORT_DELIVERY", label: "Export" }
+];
+
+const STEP_DEPENDENCIES = {
+  5: [4],
+  6: [5],
+  7: [6],
+  8: [7],
+  9: [8],
+  10: [9],
+  11: [10],
+  12: [11],
+  13: [12]
+};
+
+async function loadPipelineState() {
+  try {
+    const payload = await request(`/projects/${activeProjectId}/pipeline`);
+    pipelineState = payload.pipeline ?? null;
+    renderPipelineProgress();
+  } catch {
+    pipelineState = null;
+    renderPipelineProgress();
+  }
+}
+
+function renderPipelineProgress() {
+  const container = document.getElementById("pipelineSteps");
+  const statusEl = document.getElementById("pipelineStatus");
+  if (!container) return;
+
+  const steps = container.querySelectorAll(".pipeline-step");
+  let completedCount = 0;
+  let runningStep = null;
+
+  if (pipelineState && pipelineState.stepStatuses) {
+    WORKFLOW_STEPS.forEach(ws => {
+      const stepEl = container.querySelector(`[data-step="${ws.num}"]`);
+      if (!stepEl) return;
+      const status = pipelineState.stepStatuses[ws.num];
+      stepEl.classList.remove("pipeline-completed", "pipeline-running", "pipeline-failed", "pipeline-idle", "pipeline-blocked", "pipeline-active");
+
+      if (status === "completed") {
+        stepEl.classList.add("pipeline-completed");
+        completedCount++;
+      } else if (status === "running") {
+        stepEl.classList.add("pipeline-running");
+        runningStep = ws.num;
+      } else if (status === "failed") {
+        stepEl.classList.add("pipeline-failed");
+      } else {
+        stepEl.classList.add("pipeline-idle");
+      }
+    });
+
+    if (statusEl) {
+      statusEl.textContent = `${completedCount}/13 completed`;
+    }
+  } else {
+    steps.forEach(stepEl => stepEl.classList.add("pipeline-idle"));
+    if (statusEl) {
+      statusEl.textContent = "13 Steps";
+    }
+  }
+
+  if (runningStep) {
+    const stepEl = container.querySelector(`[data-step="${runningStep}"]`);
+    if (stepEl) stepEl.classList.add("pipeline-active");
+  }
+
+  const activeStep = pipelineState?.currentStep ?? runningStep ?? 1;
+  steps.forEach(stepEl => {
+    const stepNum = parseInt(stepEl.dataset.step);
+    if (stepNum > activeStep && pipelineState && pipelineState.stepStatuses[activeStep] === "failed") {
+      stepEl.classList.add("pipeline-blocked");
+    }
+  });
 }
 let currentProjectStatus = 'fresh';
 
@@ -481,31 +574,36 @@ async function loadSprints() {
 }
 
 async function loadProjects() {
+  showLoading("Loading projects...");
   try {
-    showLoading("Loading projects...");
     const payload = await request("/projects");
-    if (!payload.projects.length) return;
+    const projects = Array.isArray(payload?.projects) ? payload.projects : [];
+
     if (projectSelect) {
       projectSelect.innerHTML = "";
-      for (const project of payload.projects) {
+      for (const project of projects) {
         const option = document.createElement("option");
         option.value = project.id;
         option.textContent = project.name;
         projectSelect.append(option);
       }
     }
-    const activeProject = payload.projects[payload.projects.length - 1];
-    setActiveProject(activeProject.id);
-    populateIntakeForm(activeProject.intake);
-    updateArtifactSelectOptions();
-    await loadSprints(); 
-    if (typeof loadProposals === 'function') await loadProposals(); 
-    await scan();
-    await git();
-    await getGitHubStatus();
-    hideLoading();
+
+    if (projects.length > 0) {
+      const activeProject = projects[projects.length - 1];
+      setActiveProject(activeProject.id);
+      populateIntakeForm(activeProject.intake);
+      updateArtifactSelectOptions();
+      await loadSprints();
+      if (typeof loadProposals === 'function') await loadProposals();
+      await scan();
+      await git();
+      await getGitHubStatus();
+    }
+    await loadPipelineState();
   } catch (error) {
     log("Project list unavailable", String(error));
+  } finally {
     hideLoading();
   }
 }
@@ -931,6 +1029,7 @@ if (projectSelect) {
       await git();
       await getGitHubStatus();
       await loadSprints();
+      await loadPipelineState();
       
       showNotification(`Switched context to ${selectedId}`, "success", 3000);
     } catch (error) {
@@ -1048,6 +1147,54 @@ if (collapseAllTreeBtn) collapseAllTreeBtn.addEventListener("click", () => {
 if (expandAllTreeBtn) expandAllTreeBtn.addEventListener("click", () => {
   document.querySelectorAll('.dir-node').forEach(n => n.classList.remove('collapsed'));
 });
+
+// Delegate data-action buttons through the command panel
+const commandPanel = document.querySelector(".panel.command-panel");
+if (commandPanel) {
+  commandPanel.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (!action) return;
+
+    showLoading(`Running ${action}...`);
+    try {
+      switch (action) {
+        case "scan": await scan(); break;
+        case "validate": await validate(); break;
+        case "generateSpecification": await generateSpecification(); break;
+        case "applySpec": await applySpec(); break;
+        case "createHandoff": await createHandoff(); break;
+        case "exportHandoff": await exportHandoff(); break;
+        case "dryRun": await dryRun(); break;
+        case "authorizeUrls": await authorizeUrls(); break;
+        case "git": await git(); break;
+        case "accept": await accept(); break;
+        case "commit": await commit(); break;
+        case "githubSetup": await githubSetup(); break;
+        case "artifact": await viewArtifact(); break;
+        case "editArtifact": await editArtifact(); break;
+        case "previewUpdate": await previewUpdate(); break;
+        case "openRefineModal": await openRefineModal(); break;
+        case "newProject": await newProject(); break;
+        case "removeProject": break;
+        default: showNotification(`Unknown action: ${action}`, "error", 5000);
+      }
+      await loadPipelineState();
+    } catch (error) {
+      log(`Action ${action} failed`, String(error));
+      showNotification(`${action} failed: ${String(error)}`, "error", 0);
+    } finally {
+      hideLoading();
+    }
+  });
+}
+
+// ── Refine modal (placeholder, wired if relevant DOM exists) ──
+async function openRefineModal() { showNotification("Refine: select an artifact first", "info", 3000); }
+async function exportHandoff() { showNotification("Export handoffs via the Export button", "info", 3000); }
+async function commit() { showNotification("Commit: no repo action configured", "info", 3000); }
+async function newProject() { showNotification("New project picker not yet bound", "info", 3000); }
 
 window.addEventListener("DOMContentLoaded", () => {
   checkHealth();

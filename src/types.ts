@@ -6,7 +6,10 @@ export type ProjectLifecycleStatus = "fresh" | "initialized" | "in_progress" | "
 // Imported here so ProjectRecord can reference it; re-exported so the 15+ consumers
 // importing from types.js continue to work.
 import type { IntakeInput } from "./schemas/intakeSchema.js";
+import { WorkflowStep, PipelineStepStatus, PipelineProgress, WORKFLOW_STEP_NAMES } from "./types/pipeline.js";
 export type { IntakeInput };
+export { WorkflowStep, WORKFLOW_STEP_NAMES };
+export type { PipelineStepStatus, PipelineProgress };
 
 export interface ProjectRecord {
   id: string;
@@ -18,6 +21,8 @@ export interface ProjectRecord {
   status?: ProjectLifecycleStatus;
   /** ISO timestamp of the last status change. */
   statusUpdatedAt?: string;
+  /** Pipeline progress tracking (steps 1 through 13). */
+  pipelineProgress?: PipelineProgress;
 }
 
 export interface FileCheck {
