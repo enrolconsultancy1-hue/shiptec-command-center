@@ -41,7 +41,10 @@ import {
   testingTemplate,
   deploymentTemplate,
   userAgreementTemplate,
-  privacyPolicyTemplate
+  privacyPolicyTemplate,
+  readmeTemplate,
+  gitignoreTemplate,
+  ciWorkflowTemplate
 } from "./templates.js";
 import { validateIntake } from "./validation.js";
 
@@ -310,8 +313,30 @@ export async function provisionProjectFiles(project: ProjectRecord): Promise<voi
     files["Docs/Legal/Privacy_Policy.md"] = privacyPolicyTemplate(intake);
   }
 
+  // Repository root files
+  files["README.md"] = readmeTemplate(intake);
+  files[".gitignore"] = gitignoreTemplate();
+  files[".github/workflows/ci.yml"] = ciWorkflowTemplate();
+
   for (const [relativePath, content] of Object.entries(files)) {
     await writeArtifactIfMissing(project, relativePath, content);
+  }
+}
+
+export async function verifyCleanStaging(project: ProjectRecord): Promise<{ clean: boolean; unstaged: string[]; untracked: string[] }> {
+  const { gitStatus } = await import("./gitService.js");
+  try {
+    const status = await gitStatus(project.rootPath);
+    if (!status.isRepo) {
+      return { clean: true, unstaged: [], untracked: [] };
+    }
+    return {
+      clean: status.clean,
+      unstaged: status.changedFiles,
+      untracked: []
+    };
+  } catch {
+    return { clean: false, unstaged: [], untracked: [] };
   }
 }
 

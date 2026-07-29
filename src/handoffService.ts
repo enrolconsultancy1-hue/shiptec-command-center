@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { ProjectRecord, ExportFormat, TargetEditor, HandoffExportResult } from "./types.js";
 import { readProjectArtifact } from "./projectService.js";
+import { readmeTemplate, gitignoreTemplate, ciWorkflowTemplate } from "./templates.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { ZipArchive } from "archiver";
@@ -416,6 +417,9 @@ export async function createHandoffPackage(project: ProjectRecord, editor: Targe
   // ── Phase 1: MANIFEST.json ────────────────────────────────
   const manifestFiles: { path: string; agentTarget?: string }[] = [
     ...ESSENTIAL_ARTIFACTS.map(p => ({ path: p })),
+    { path: "README.md" },
+    { path: ".gitignore" },
+    { path: ".github/workflows/ci.yml" },
     { path: "HANDOFF_SUMMARY.txt" },
     { path: "MANIFEST.json" },
     { path: "AGENTS.md" },
@@ -742,6 +746,7 @@ async function collectHandoffFiles(project: ProjectRecord, editor: TargetEditor)
   // Generated orchestration files
   const allFiles = [
     ...ESSENTIAL_ARTIFACTS.map(p => ({ path: p })),
+    { path: "README.md" }, { path: ".gitignore" }, { path: ".github/workflows/ci.yml" },
     { path: "HANDOFF_SUMMARY.txt" }, { path: "MANIFEST.json" }, { path: "AGENTS.md" },
     { path: "CLAUDE.md" }, { path: ".cursorrules" }, { path: ".antigravityrules" },
     { path: "OPENCODE.md" }, { path: "CODEX.md" }, { path: ".env.example" },
@@ -762,6 +767,11 @@ async function collectHandoffFiles(project: ProjectRecord, editor: TargetEditor)
   files.set("EXECUTION_SEQUENCE.md", generateExecutionSequence(project));
   files.set("HANDOFF_GUIDE.md", generateEditorGuide(project, editor));
 
+  // Repository root artifacts
+  files.set("README.md", readmeTemplate(project.intake));
+  files.set(".gitignore", gitignoreTemplate());
+  files.set(".github/workflows/ci.yml", ciWorkflowTemplate());
+
   return files;
 }
 
@@ -779,7 +789,9 @@ export async function exportHandoffPackage(
     await fs.mkdir(destDir, { recursive: true });
 
     for (const [filename, content] of files) {
-      await fs.writeFile(path.join(destDir, filename), content);
+      const filePath = path.join(destDir, filename);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, content);
     }
 
     return {
